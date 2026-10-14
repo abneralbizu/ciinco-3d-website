@@ -1,0 +1,224 @@
+// Everything on the page that is not 3D: navigation, reveals, counters,
+// the contact form and the Crexi listings viewer. Works without WebGL.
+
+const $ = (s, el = document) => el.querySelector(s);
+const $$ = (s, el = document) => Array.from(el.querySelectorAll(s));
+export const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)');
+
+export const FOUNDED = 1990;
+
+export function initUI(bus) {
+  const chapters = $$('.chapter');
+
+  // ---- Years in business, copyright year --------------------------------
+  const year = new Date().getFullYear();
+  const years = year - FOUNDED;
+  $$('.js-years').forEach((el) => { el.textContent = String(years); });
+  const y = $('#year');
+  if (y) y.textContent = String(year);
+
+  // ---- Mobile navigation --------------------------------------------------
+  const toggle = $('.nav-toggle');
+  const list = $('#nav-list');
+  const closeNav = () => { toggle.setAttribute('aria-expanded', 'false'); list.classList.remove('is-open'); };
+  toggle.addEventListener('click', () => {
+    const open = toggle.getAttribute('aria-expanded') !== 'true';
+    toggle.setAttribute('aria-expanded', String(open));
+    list.classList.toggle('is-open', open);
+    if (open) list.querySelector('a').focus();
+  });
+  document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && list.classList.contains('is-open')) { closeNav(); toggle.focus(); } });
+
+  // ---- In-page links: land each chapter where the camera arrives ---------
+  document.addEventListener('click', (e) => {
+    const a = e.target.closest('a[href^="#"]');
+    if (!a) return;
+    const id = a.getAttribute('href').slice(1);
+    const target = id === 'main' ? chapters[0] : document.getElementById(id);
+    if (!target) return;
+    const chapter = target.closest('.chapter') || target;
+    const idx = chapters.indexOf(chapter);
+    if (idx < 0) return;
+    e.preventDefault();
+    closeNav();
+    if (a.dataset.interest) { const sel = $('#f-interest'); if (sel) sel.value = a.dataset.interest; }
+    goToChapter(idx, chapter);
+  });
+
+  function goToChapter(idx, chapter = chapters[idx]) {
+    const top = bus.anchorFor ? bus.anchorFor(idx) : chapter.offsetTop;
+    window.scrollTo({ top, behavior: reducedMotion.matches ? 'auto' : 'smooth' });
+    const focusEl = chapter.querySelector('h1, h2') || chapter;
+    focusEl.setAttribute('tabindex', '-1');
+    focusEl.focus({ preventScroll: true });
+    history.replaceState(null, '', idx === 0 ? location.pathname : `#${chapter.id}`);
+  }
+  bus.goToChapter = goToChapter;
+
+  // ---- Reveal on view -------------------------------------------------------
+  $$('.reveal-stagger').forEach((el) => { Array.from(el.children).forEach((c, i) => c.style.setProperty('--i', i)); });
+  const io = new IntersectionObserver((entries) => {
+    for (const en of entries) {
+      if (en.isIntersecting) {
+        en.target.classList.add('is-in');
+        if (en.target.id === 'record') runCounters(en.target);
+        io.unobserve(en.target);
+      }
+    }
+  }, { threshold: 0.18, rootMargin: '0px 0px -10% 0px' });
+  bus.startReveals = () => chapters.forEach((c) => io.observe(c));
+
+  // ---- Counters -------------------------------------------------------------
+  function runCounters(root) {
+    $$('[data-count]', root).forEach((el) => {
+      const end = parseInt(el.textContent, 10);
+      if (!Number.isFinite(end) || reducedMotion.matches) return;
+      const t0 = performance.now() + 450;
+      const dur = 1800;
+      el.textContent = '0';
+      const step = (now) => {
+        const t = Math.min(1, Math.max(0, (now - t0) / dur));
+        const e = t === 1 ? 1 : 1 - Math.pow(2, -10 * t);
+        el.textContent = String(Math.round(end * e));
+        if (t < 1) requestAnimationFrame(step);
+      };
+      requestAnimationFrame(step);
+    });
+  }
+
+  // ---- Chapter state (nav, system map, telemetry) -----------------------
+  const navLinks = $$('.site-nav a');
+  const mapLinks = $$('.system-map a');
+  const fill = $('#sm-fill');
+  const sector = $('#tm-sector');
+  const coords = $('#tm-coords');
+  let lastActive = -1;
+  bus.setProgress = (p, active, cam) => {
+    if (fill) fill.style.transform = `scaleY(${(p / (chapters.length - 1)).toFixed(4)})`;
+    if (active !== lastActive) {
+      lastActive = active;
+      mapLinks.forEach((a, i) => a.classList.toggle('is-active', i === active));
+      const id = chapters[active] && chapters[active].id;
+      navLinks.forEach((a) => a.setAttribute('aria-current', String(a.getAttribute('href') === `#${id}`)));
+      if (sector) {
+        const name = mapLinks[active] ? mapLinks[active].querySelector('.sm-name').textContent : '';
+        sector.textContent = `Sector ${String(active).padStart(2, '0')} · ${name}`;
+      }
+    }
+    if (coords && cam) {
+      const f = (n) => (n < 0 ? '-' : '+') + String(Math.abs(Math.round(n))).padStart(4, '0');
+      coords.textContent = `X ${f(cam.x)} · Y ${f(cam.y)} · Z ${f(cam.z)}`;
+    }
+  };
+
+  // Header: tinted once scrolled, hidden while scrolling down, back on scroll up.
+  const header = $('.site-header');
+  let lastY = window.scrollY;
+  window.addEventListener('scroll', () => {
+    const yy = window.scrollY;
+    header.classList.toggle('is-scrolled', yy > 40);
+    const navOpen = list.classList.contains('is-open');
+    if (!navOpen && Math.abs(yy - lastY) > 6) header.classList.toggle('is-hidden', yy > lastY && yy > 400);
+    lastY = yy;
+  }, { passive: true });
+  header.addEventListener('focusin', () => header.classList.remove('is-hidden'));
+
+  // Footer in view: tuck the chapter chrome away.
+  const footer = $('.site-footer');
+  new IntersectionObserver(([en]) => document.body.classList.toggle('at-footer', en.isIntersecting), { threshold: 0.05 }).observe(footer);
+
+  // ---- Crexi listings viewer (loaded only on request) ----------------------
+  const crexiBtn = $('#crexi-load');
+  if (crexiBtn) {
+    crexiBtn.addEventListener('click', () => {
+      const f = document.createElement('iframe');
+      f.className = 'crexi-frame';
+      f.src = 'https://www.crexi.com/widgets/1594';
+      f.title = 'CIIN Co. commercial listings on Crexi';
+      f.loading = 'lazy';
+      f.referrerPolicy = 'strict-origin-when-cross-origin';
+      crexiBtn.replaceWith(f);
+    });
+  }
+
+  // ---- Contact form -------------------------------------------------------
+  const form = $('#contact-form');
+  if (form) {
+    const status = $('.form-status', form);
+    const rules = [
+      ['f-name', (v) => v.trim().length > 1, 'Please enter your name.'],
+      ['f-email', (v) => /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(v.trim()), 'Please enter a valid email address.'],
+      ['f-message', (v) => v.trim().length > 4, 'Please tell us a little about what you need.'],
+    ];
+    const check = (id, ok, msg) => {
+      const el = $(`#${id}`, form);
+      const err = $(`#${id}-err`, form);
+      const valid = ok(el.value);
+      el.setAttribute('aria-invalid', String(!valid));
+      if (valid) { el.removeAttribute('aria-describedby'); err.textContent = ''; } else { el.setAttribute('aria-describedby', `${id}-err`); err.textContent = msg; }
+      return valid;
+    };
+    rules.forEach(([id, ok, msg]) => $(`#${id}`, form).addEventListener('blur', (e) => { if (e.target.value) check(id, ok, msg); }));
+    form.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      status.className = 'form-status';
+      status.textContent = '';
+      const results = rules.map((r) => check(...r));
+      if (results.includes(false)) {
+        const first = rules[results.indexOf(false)][0];
+        $(`#${first}`, form).focus();
+        status.classList.add('is-error');
+        status.textContent = 'Please check the highlighted fields.';
+        return;
+      }
+      if (form.company_website.value) return; // spam trap
+      const btn = form.querySelector('button[type="submit"]');
+      btn.disabled = true;
+      status.textContent = 'Sending…';
+      try {
+        const res = await fetch('/', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+          body: new URLSearchParams(new FormData(form)).toString(),
+        });
+        if (!res.ok) throw new Error(String(res.status));
+        window.location.href = form.getAttribute('action');
+      } catch (err) {
+        btn.disabled = false;
+        status.classList.add('is-error');
+        status.innerHTML = 'Your message could not be sent. Please email <a href="mailto:rafael@ciinco.com">rafael@ciinco.com</a> or call <a href="tel:+14077395959">407-739-5959</a>.';
+      }
+    });
+  }
+
+  // ---- Hover links between the page and the 3D scene ----------------------
+  $$('#type-chips li').forEach((li, i) => {
+    li.addEventListener('pointerenter', () => bus.hotType && bus.hotType(i));
+    li.addEventListener('pointerleave', () => bus.hotType && bus.hotType(-1));
+  });
+  $$('#consulting li').forEach((li) => {
+    const i = parseInt(li.dataset.node, 10);
+    li.addEventListener('pointerenter', () => bus.hotNode && bus.hotNode(i));
+    li.addEventListener('pointerleave', () => bus.hotNode && bus.hotNode(-1));
+  });
+  $$('.office').forEach((li) => {
+    li.addEventListener('pointerenter', () => bus.hotOffice && bus.hotOffice(li.dataset.office));
+    li.addEventListener('pointerleave', () => bus.hotOffice && bus.hotOffice(null));
+  });
+  bus.markType = (i) => $$('#type-chips li').forEach((li, k) => li.classList.toggle('is-hot', k === i));
+  bus.markNode = (i) => $$('#consulting li').forEach((li) => li.classList.toggle('is-hot', parseInt(li.dataset.node, 10) === i));
+  bus.markOffice = (id) => $$('.office').forEach((li) => li.classList.toggle('is-hot', li.dataset.office === id));
+
+  return { chapters };
+}
+
+// Loader progress and dismissal.
+export function setLoader(frac) {
+  const pct = $('#loader-pct');
+  const bar = $('#loader-bar');
+  if (pct) pct.textContent = `${Math.round(frac * 100)}%`;
+  if (bar) bar.style.transform = `scaleX(${frac.toFixed(3)})`;
+}
+export function finishLoading() {
+  document.body.classList.remove('is-loading');
+}

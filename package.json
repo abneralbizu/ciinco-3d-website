@@ -1,0 +1,27 @@
+{
+  "name": "ciinco-cosmos",
+  "version": "1.0.0",
+  "description": "CIIN Co. Cosmos: immersive 3D real estate website",
+  "scripts": {
+    "build": "esbuild src/main.js --bundle --minify --format=iife --target=es2019 --legal-comments=none --outfile=site/assets/js/cosmos.js",
+    "dev": "esbuild src/main.js --bundle --sourcemap --format=iife --outfile=site/assets/js/cosmos.js --watch",
+    "serve": "python3 -m http.server 8080 --directory site",
+    "textures": "node tools/export-geo.mjs && python3 tools/generate_textures.py"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "UNLICENSED",
+  "dependencies": {
+    "three": "^0.169.0"
+  },
+  "devDependencies": {
+    "@fontsource-variable/archivo": "^5.3.0",
+    "@fontsource/instrument-serif": "^5.3.0",
+    "@fontsource/jetbrains-mono": "^5.3.0",
+    "all-the-cities": "^3.1.0",
+    "esbuild": "^0.24.0",
+    "topojson-client": "^3.1.0",
+    "world-atlas": "^2.0.2"
+  },
+  "private": true
+}

@@ -1,0 +1,30 @@
+# Security and caching headers. Netlify and Cloudflare Pages read this file
+# automatically; on other hosts, set the same headers in the host's dashboard.
+#
+# Content-Security-Policy: everything is served from this site. The only
+# outside source is the optional Crexi listings viewer (frame-src).
+# If the contact form is moved to an outside form service, add its address
+# to form-action and connect-src (for example: https://formspree.io).
+/*
+  Content-Security-Policy: default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data: blob:; font-src 'self'; connect-src 'self'; frame-src https://www.crexi.com; form-action 'self'; frame-ancestors 'none'; base-uri 'self'; object-src 'none'; worker-src 'self' blob:; manifest-src 'self'; upgrade-insecure-requests
+  X-Content-Type-Options: nosniff
+  X-Frame-Options: DENY
+  Referrer-Policy: strict-origin-when-cross-origin
+  Permissions-Policy: camera=(), microphone=(), geolocation=(), payment=(), usb=()
+  Cross-Origin-Opener-Policy: same-origin
+  Strict-Transport-Security: max-age=31536000; includeSubDomains
+
+# Textures, fonts and images never change in place (new art gets a new name),
+# so browsers may keep them for a year.
+/assets/textures/*
+  Cache-Control: public, max-age=31536000, immutable
+/assets/fonts/*
+  Cache-Control: public, max-age=31536000, immutable
+/assets/images/*
+  Cache-Control: public, max-age=604800
+
+# Code and styles: always check for a newer version.
+/assets/js/*
+  Cache-Control: public, max-age=0, must-revalidate
+/assets/css/*
+  Cache-Control: public, max-age=0, must-revalidate

@@ -1,0 +1,9 @@
+# Netlify settings for the CIIN Co. Cosmos website.
+# The site in /site is ready to publish as-is (the JavaScript bundle is committed),
+# so no build step runs on Netlify. Security headers live in site/_headers.
+[build]
+  publish = "site"
+  command = ""
+
+[build.processing]
+  skip_processing = true
