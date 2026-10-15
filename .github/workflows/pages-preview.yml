@@ -1,0 +1,49 @@
+# Publishes the site folder to GitHub Pages as a review preview.
+# The preview copy is hidden from search engines (noindex + robots.txt).
+# Turn it on once: repo Settings > Pages > Build and deployment > Source: "GitHub Actions".
+name: Preview on GitHub Pages
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Prepare the preview copy
+        run: |
+          mkdir -p _preview
+          cp -r site/. _preview/
+          # The site is served from /<repo-name>/, so root-relative links in 404.html need that prefix.
+          base="/${GITHUB_REPOSITORY#*/}"
+          sed -i "s#href=\"/#href=\"$base/#g; s#src=\"/#src=\"$base/#g" _preview/404.html
+          # Keep the preview out of search engines.
+          for f in _preview/*.html; do
+            grep -q 'name="robots"' "$f" || sed -i 's#<meta charset="utf-8">#<meta charset="utf-8">\n  <meta name="robots" content="noindex, nofollow">#' "$f"
+          done
+          printf 'User-agent: *\nDisallow: /\n' > _preview/robots.txt
+          # Netlify-only files have no effect on GitHub Pages.
+          rm -f _preview/_headers _preview/_redirects
+
+      - uses: actions/configure-pages@v5
+      - uses: actions/upload-pages-artifact@v4
+        with:
+          path: _preview
+      - id: deployment
+        uses: actions/deploy-pages@v4

@@ -96,6 +96,17 @@ npm install
 npm run textures     # needs Python 3 with numpy + pillow
 ```
 
+## Preview on GitHub Pages (before launch)
+
+Every push to `main` also publishes a review copy through GitHub Pages
+(`.github/workflows/pages-preview.yml`), at `https://abneralbizu.github.io/ciinco-3d-website/`.
+The preview is hidden from search engines, but anyone who has the link can open it.
+
+Turn it on once: repo **Settings → Pages → Build and deployment → Source: GitHub Actions**.
+GitHub Pages on a private repository needs a paid GitHub plan (Pro, Team or Enterprise);
+on the free plan the repository has to be public. The contact form only works on Netlify, and
+the security headers in `site/_headers` apply on Netlify and Cloudflare Pages, not on GitHub Pages.
+
 ## Publishing (Netlify)
 
 1. Push this folder to its GitHub repository.
