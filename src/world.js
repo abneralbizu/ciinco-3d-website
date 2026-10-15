@@ -885,7 +885,7 @@ export function buildWorld(scene, tex, data, quality) {
     beam.position.copy(pos);
     beam.frustumCulled = false;
     scene.add(beam);
-    world.hit.push({ center: pos, r: 0, chapter: i === 0 ? 2 : 3, label: i === 0 ? 'New York · Commercial' : 'Orlando · Commercial & residential', place: pl });
+    world.hit.push({ center: pos, r: 0, chapter: i === 0 ? 2 : 3, label: i === 0 ? 'New York · Commercial' : 'Florida · Commercial & residential', place: pl });
     return { ...pl, id: i === 0 ? 'new-york' : 'orlando', pos, ring, beam, ringMat, beamMat: bm };
   });
   {

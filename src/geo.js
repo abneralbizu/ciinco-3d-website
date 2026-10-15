@@ -56,6 +56,6 @@ export const PLACES = {
   nyOffice: { lat: 40.7459, lon: -73.9867, name: 'New York', sub: 'Commercial · 276 Fifth Ave.' }, // 5th Ave & 30th St
   orlando: { lat: 28.5434, lon: -81.3765 },
   lakeEola: { lat: 28.5434, lon: -81.3725 },
-  orlandoOffice: { lat: 28.6555, lon: -81.2605, name: 'Orlando', sub: 'Commercial · Residential · Winter Springs' }, // Willa Springs, Red Bug Lake Rd & Tuskawilla Rd
+  orlandoOffice: { lat: 28.6555, lon: -81.2605, name: 'Florida', sub: 'Commercial · Residential · Winter Springs' }, // Willa Springs, Red Bug Lake Rd & Tuskawilla Rd
   lakeJesup: { lat: 28.722, lon: -81.235 },
 };
