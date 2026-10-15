@@ -23,6 +23,7 @@ const FOG = /* glsl */ `
     return mix(col, hazeColor(d / dist), clamp(f, 0.0, 1.0));
   }
 `;
+export const FOG_CHUNK = FOG;
 export const fogUniforms = (u) => ({ uFogCool: u.cool, uFogWarm: u.warm, uSunDir: u.sun, uFogDensity: u.density, uDetail: u.detail });
 
 const HASH = /* glsl */ `

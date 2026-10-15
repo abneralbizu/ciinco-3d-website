@@ -5,7 +5,7 @@ import {
   AdditiveBlending, BackSide, BoxGeometry, BufferAttribute, BufferGeometry, Color, CylinderGeometry, DoubleSide,
   Float32BufferAttribute, Group, IcosahedronGeometry, InstancedBufferAttribute, InstancedMesh, Matrix4, Mesh,
   LineSegments, MeshBasicMaterial, Object3D, PlaneGeometry, Points, Quaternion, RingGeometry, ShaderMaterial,
-  Shape, ShapeGeometry, SphereGeometry, TubeGeometry, CatmullRomCurve3, Vector2, Vector3,
+  Shape, ShapeGeometry, SphereGeometry, TubeGeometry, ExtrudeGeometry, CatmullRomCurve3, Vector2, Vector3,
 } from 'three';
 import * as S from './shaders.js';
 import { P, k, grid, AVENUES, PLACES } from './geo.js';
@@ -481,14 +481,92 @@ export function buildWorld(scene, tex, data, quality) {
     nyc.add(trafficPoints(cars, { uTime, uPixelRatio, uSize: { value: 16 }, ...F }));
   }
 
-  // Liberty Island torch
+  // Statue of Liberty on Liberty Island: star-shaped fort, granite pedestal, the copper
+  // figure with crown and raised torch, floodlit from below as she is at night.
   {
-    const v = L(40.6892, -74.0445, 93);
-    const g = new Mesh(new PlaneGeometry(1, 1), mat(S.glowSprite, { uColor: { value: new Color(1, 0.8, 0.45) }, uIntensity: { value: 2.5 } }, additive));
-    g.position.copy(v);
-    g.scale.setScalar(60 * upmN);
-    nyc.add(g);
-    world.billboards = [g];
+    const base = L(40.6892, -74.0445);
+    const statue = new Group();
+    statue.position.copy(base);
+    statue.scale.setScalar(upmN);                    // build in metres
+    statue.rotation.y = -Math.PI * 0.72;             // facing the harbour entrance (south-east)
+    const lit = (color, rim) => new ShaderMaterial({
+      vertexShader: `varying vec3 vN; varying vec3 vP; varying float vY;
+        void main(){ vY = position.y; vec4 wp = modelMatrix * vec4(position,1.0); vP = wp.xyz; vN = normalize(mat3(modelMatrix)*normal); gl_Position = projectionMatrix*viewMatrix*wp; }`,
+      fragmentShader: `uniform vec3 uColor; uniform vec3 uRim; uniform float uTop;
+        ${S.FOG_CHUNK}
+        varying vec3 vN; varying vec3 vP; varying float vY;
+        void main(){
+          vec3 N = normalize(vN); vec3 V = normalize(cameraPosition - vP);
+          float flood = 0.55 + 0.45 * max(dot(N, normalize(vec3(0.2, 0.55, 0.0) + V * 0.8)), 0.0);   // floodlights from the island
+          float fall = 1.0 - 0.35 * clamp(vY / uTop, 0.0, 1.0);
+          float rim = pow(clamp(1.0 - dot(N, V), 0.0, 1.0), 2.5);
+          vec3 col = uColor * flood * fall + uRim * rim * 0.8;
+          gl_FragColor = vec4(applyFog(col, vP), 1.0);
+        }`,
+      uniforms: { uColor: { value: new Color(...color) }, uRim: { value: new Color(...rim) }, uTop: { value: 93 }, ...F },
+    });
+    const copper = lit([0.30, 0.68, 0.58], [0.6, 1.0, 0.9]);
+    const stone = lit([0.085, 0.075, 0.065], [0.14, 0.12, 0.09]);
+    const add = (geo, m, x, y, z, rx = 0, rz = 0) => { const o = new Mesh(geo, m); o.position.set(x, y, z); o.rotation.set(rx, 0, rz); statue.add(o); return o; };
+    // Fort Wood: an eleven-point star
+    const star = new Shape();
+    for (let i = 0; i < 22; i++) {
+      const a = (i / 22) * Math.PI * 2, rad = i % 2 ? 36 : 52;
+      i ? star.lineTo(Math.cos(a) * rad, Math.sin(a) * rad) : star.moveTo(Math.cos(a) * rad, Math.sin(a) * rad);
+    }
+    const fort = new ExtrudeGeometry(star, { depth: 9, bevelEnabled: false });
+    fort.rotateX(-Math.PI / 2);
+    add(fort, stone, 0, 0, 0);
+    // Pedestal (square, tapering) and its cap
+    add(new CylinderGeometry(9.5, 13, 38, 4, 1), stone, 0, 9 + 19, 0).rotation.y = Math.PI / 4;
+    add(new CylinderGeometry(10.5, 10.5, 2.5, 4, 1), stone, 0, 47, 0).rotation.y = Math.PI / 4;
+    // Robe, shoulders, head and crown
+    add(new CylinderGeometry(3.4, 6.2, 30, 16), copper, 0, 48 + 15, 0);
+    add(new SphereGeometry(3.6, 16, 10), copper, 0, 78, 0);
+    add(new SphereGeometry(2.3, 16, 12), copper, 0, 82.5, 0.6);
+    for (let i = 0; i < 7; i++) {
+      const a = -0.95 + (i / 6) * 1.9;
+      const ray = add(new CylinderGeometry(0.05, 0.35, 4.2, 5), copper, Math.sin(a) * 2.6, 84.5, Math.cos(a) * 2.6 * 0.6 + 0.6);
+      ray.rotation.set(Math.cos(a) * 0.9, 0, -Math.sin(a) * 0.9);
+    }
+    // Raised right arm and torch; tablet in the left arm
+    add(new CylinderGeometry(0.9, 1.2, 13, 10), copper, 3.2, 86, 0, 0, -0.18);
+    add(new CylinderGeometry(1.0, 0.6, 2.4, 10), copper, 4.4, 92.4, 0);
+    add(new BoxGeometry(1.2, 6.5, 4.2), copper, -4.0, 70, 0.6, 0, 0.25);
+    const flame = new Mesh(new PlaneGeometry(1, 1), mat(S.glowSprite, { uColor: { value: new Color(1, 0.78, 0.4) }, uIntensity: { value: 2.6 } }, additive));
+    flame.position.set(4.4, 94.5, 0);
+    flame.scale.setScalar(11);
+    statue.add(flame);
+    const core = new Mesh(new PlaneGeometry(1, 1), mat(S.glowSprite, { uColor: { value: new Color(1, 0.95, 0.8) }, uIntensity: { value: 4.0 } }, additive));
+    core.position.copy(flame.position);
+    core.scale.setScalar(3.2);
+    statue.add(core);
+    // a soft pool of floodlight around the base
+    const pool = new Mesh(new PlaneGeometry(1, 1), mat(S.glowSprite, { uColor: { value: new Color(0.55, 0.9, 0.8) }, uIntensity: { value: 0.18 } }, additive));
+    pool.position.set(0, 40, 0);
+    pool.scale.setScalar(120);
+    statue.add(pool);
+    // Liberty Island is a park, not city streets
+    {
+      const lawn = [];
+      for (let i = 0; i < 32; i++) { const t = (i / 32) * Math.PI * 2; lawn.push([base.x + Math.cos(t) * 190 * upmN, base.z + Math.sin(t) * 150 * upmN]); }
+      const lm = shapeMesh([lawn], groundMat(2, 1, '#ffd9a0'), -0.12);
+      lm.renderOrder = -6;
+      nyc.add(lm);
+    }
+    // Glows go in an unrotated twin group so they can face the camera.
+    const glows = new Group();
+    glows.position.copy(statue.position);
+    glows.scale.copy(statue.scale);
+    for (const g of [flame, core, pool]) {
+      statue.remove(g);
+      g.position.applyAxisAngle(new Vector3(0, 1, 0), statue.rotation.y);
+      glows.add(g);
+    }
+    statue.traverse((o) => { o.frustumCulled = false; });
+    glows.traverse((o) => { o.frustumCulled = false; });
+    nyc.add(statue, glows);
+    world.billboards = [flame, core, pool];
   }
 
   // =========================================================================
