@@ -114,6 +114,13 @@ export function initUI(bus) {
       if (stepName) stepName.textContent = chapterName(i + 1);
     }
   };
+  // When a chapter's own Next button is on screen, the corner buttons step aside (phones).
+  const seen = new Set();
+  const nio = new IntersectionObserver((entries) => {
+    entries.forEach((en) => (en.isIntersecting ? seen.add(en.target) : seen.delete(en.target)));
+    document.body.classList.toggle('next-visible', seen.size > 0);
+  });
+  $$('.next-row, #home-port .cta-row, #launch .cta-row').forEach((el) => nio.observe(el));
   if (stepPrev) stepPrev.addEventListener('click', () => goToChapter(Math.max(0, current() - 1)));
   if (stepNext) stepNext.addEventListener('click', () => goToChapter(Math.min(chapters.length - 1, current() + 1)));
   updateStepper();

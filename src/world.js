@@ -65,6 +65,53 @@ class BoxBatch {
   }
 }
 
+/**
+ * One building as real massing: a podium with the tower set back above it (sometimes twice),
+ * a mechanical penthouse on the roof, or a plain block with rooftop plant. Heights in units.
+ * style: 0 masonry, 1 glass, 3 Florida stucco/concrete. Returns the roof top (units) and footprint.
+ */
+function massing(B, r, x, z, w, d, h, rot, style, upm, id = -1, tanks = null) {
+  const hm = h / upm;
+  const seed = r();
+  const c = Math.cos(rot), sn = Math.sin(rot);
+  const at = (ox, oz) => [x + ox * c + oz * sn, z - ox * sn + oz * c];
+  let fw = w, fd = d;
+  if (hm > 105 && r() < 0.85) {
+    const podH = Math.min(hm * 0.28, 16 + r() * 22);
+    B.add(x, z, w, d, podH * upm, rot, seed, style === 1 && r() < 0.5 ? (B.florida ? 3 : 0) : style, id);
+    let y = podH;
+    const f1 = 0.6 + r() * 0.22;
+    if (r() < 0.45) {
+      const h1 = (hm - podH) * (0.55 + r() * 0.2);
+      B.add(x, z, w * f1, d * f1, h1 * upm, rot, seed, style, id, y * upm);
+      y += h1;
+      const f2 = f1 * (0.68 + r() * 0.15);
+      B.add(x, z, w * f2, d * f2, (hm - y) * upm, rot, seed, style, id, y * upm);
+      fw = w * f2; fd = d * f2;
+    } else {
+      B.add(x, z, w * f1, d * f1, (hm - y) * upm, rot, seed, style, id, y * upm);
+      fw = w * f1; fd = d * f1;
+    }
+    B.add(x, z, fw * 0.5, fd * 0.5, (5 + r() * 7) * upm, rot, seed, 2, id, h);
+    return;
+  }
+  B.add(x, z, w, d, h, rot, seed, style, id);
+  if (hm > 40 && hm <= 105 && r() < 0.3) {
+    // a few set-back top floors
+    const t = (6 + r() * 10) * upm;
+    B.add(x, z, w * 0.78, d * 0.78, t, rot, seed, style, id, h);
+    h += t; fw = w * 0.78; fd = d * 0.78;
+  }
+  if (hm > 14) {
+    const [px, pz] = at((r() - 0.5) * fw * 0.3, (r() - 0.5) * fd * 0.3);
+    if (r() < (hm > 30 ? 0.55 : 0.25)) B.add(px, pz, fw * (0.14 + r() * 0.12), fd * (0.16 + r() * 0.12), (2.5 + r() * 2.5) * upm, rot, seed, 2, id, h);
+    if (tanks && style === 0 && hm < 95 && r() < 0.4) {
+      const [tx, tz] = at((r() - 0.5) * fw * 0.6, (r() - 0.5) * fd * 0.6);
+      tanks.push([tx, tz, h, (5 + r() * 2.5) * upm, r()]);
+    }
+  }
+}
+
 /** Raster mask of polygons (local x/z) for fast "is this on land / on Manhattan?" tests. */
 function makeMask(layers, half, size = 2048) {
   const c = document.createElement('canvas');
@@ -136,6 +183,28 @@ function ribbonGeometry(points, width, yLift = 0.02) {
   return g;
 }
 
+/** Lamp-lit promenade following a closed ring (local x/z): quads for the street shader. */
+function edgeLightsGeometry(rings, widthU, spacingU, y = 0.04) {
+  const pos = [], uv = [];
+  for (const ring of rings) {
+    let acc = 0;
+    for (let i = 0; i < ring.length; i++) {
+      const [ax, az] = ring[i], [bx, bz] = ring[(i + 1) % ring.length];
+      const len = Math.hypot(bx - ax, bz - az);
+      if (len < 1e-6) continue;
+      const nx = -(bz - az) / len * widthU / 2, nz = (bx - ax) / len * widthU / 2;
+      const ua = acc / spacingU, ub = (acc + len) / spacingU;
+      pos.push(ax + nx, y, az + nz, ax - nx, y, az - nz, bx + nx, y, bz + nz, ax - nx, y, az - nz, bx - nx, y, bz - nz, bx + nx, y, bz + nz);
+      uv.push(ua, 0, ua, 1, ub, 0, ua, 1, ub, 1, ub, 0);
+      acc += len;
+    }
+  }
+  const g = new BufferGeometry();
+  g.setAttribute('position', new Float32BufferAttribute(pos, 3));
+  g.setAttribute('uv', new Float32BufferAttribute(uv, 2));
+  return g;
+}
+
 /** Points that travel along segments (cars) or sit still (bridge lights). */
 function trafficPoints(segments, uniforms) {
   const n = segments.length;
@@ -170,7 +239,10 @@ export function buildWorld(scene, tex, data, quality) {
   };
   const uZenith = { value: new Color(0.006, 0.010, 0.040) };
   const F = S.fogUniforms(fog);
-  const world = { uTime, uPixelRatio, fog, uZenith, hit: [] };
+  const world = { uTime, uPixelRatio, fog, uZenith, hit: [], waterMeshes: [] };
+  // Shared by every water surface: the mirrored scene, rendered each frame in main.js.
+  const reflectU = { uReflect: { value: null }, uReflectMat: { value: new Matrix4() }, uReflectOn: { value: 0 }, uMirrorY: { value: 0 } };
+  world.reflect = reflectU;
 
   // ---- Sky ----------------------------------------------------------------
   {
@@ -212,8 +284,9 @@ export function buildWorld(scene, tex, data, quality) {
 
   // Ground: water first, then land, then the park, all flat and drawn in order.
   {
-    const wm = mat(S.water, { uTime, uUnitsPerM: { value: upmN }, uZenith, ...F }, flat());
+    const wm = mat(S.water, { uTime, uUnitsPerM: { value: upmN }, uZenith, ...reflectU, ...F }, flat());
     const water = new Mesh(new PlaneGeometry(1, 1), wm);
+    world.waterMeshes.push(water);
     water.geometry.rotateX(-Math.PI / 2);
     water.scale.set(900, 1, 900);
     water.position.y = -0.3;
@@ -239,9 +312,14 @@ export function buildWorld(scene, tex, data, quality) {
 
   const landLayers = [];
   const manhattanPolys = [];
-  for (const [name, polys] of Object.entries(data.nyc)) {
+  const parkIslands = [];
+  for (const [name, polys0] of Object.entries(data.nyc)) {
     if (name.startsWith('_')) continue;
     const isMan = name === 'Manhattan';
+    // Liberty, Ellis and Governors Islands (and the small piers off the Battery) are parkland.
+    const southOf = (p) => Math.max(...p.outer.map(([, la]) => la)) < 40.7045;
+    const polys = isMan ? polys0.filter((p) => !southOf(p)) : polys0;
+    if (isMan) parkIslands.push(...polys0.filter(southOf).map((p) => [toLocal(p.outer), ...p.holes.map(toLocal)]));
     const m = isMan ? groundMat(1, 1, '#d9e3ff') : groundMat(0, name === 'Brooklyn' || name === 'Queens' ? 1 : 0.7, '#ffb36b');
     if (isMan) {
       m.uniforms.uGridInv.value.set(inv);
@@ -251,6 +329,26 @@ export function buildWorld(scene, tex, data, quality) {
     rings.forEach((r) => { const mesh = shapeMesh(r, m, -0.2); mesh.renderOrder = -8; nyc.add(mesh); });
     landLayers.push({ polys: rings, color: isMan ? '#ffff00' : '#ff0000' });
     if (isMan) manhattanPolys.push(...rings);
+  }
+  {
+    const im = groundMat(2, 1, '#ffd9a0');
+    parkIslands.forEach((rings) => { const mesh = shapeMesh(rings, im, -0.16); mesh.renderOrder = -7; nyc.add(mesh); });
+    // seawall promenades, lamp-lit
+    const lamps = [];
+    const lc = new Color(1.6, 1.3, 0.9);
+    for (const [ring] of parkIslands) {
+      let acc = 0;
+      for (let i = 0; i < ring.length; i++) {
+        const [ax, az] = ring[i], [bx, bz] = ring[(i + 1) % ring.length];
+        const len = Math.hypot(bx - ax, bz - az);
+        for (let d = (25 * upmN - acc % (25 * upmN)); d < len; d += 25 * upmN) {
+          const p = new Vector3(ax + (bx - ax) * d / len, 0.05, az + (bz - az) * d / len);
+          lamps.push([p, p, 0, 0, lc]);
+        }
+        acc += len;
+      }
+    }
+    nyc.add(trafficPoints(lamps, { uTime, uPixelRatio, uSize: { value: 10 }, ...F }));
   }
   // Central Park and the Reservoir
   const parkCorners = [gridToLocal(0, 59.6), gridToLocal(3, 59.6), gridToLocal(3, 110), gridToLocal(0, 110)].map((v) => [v.x, v.z]);
@@ -265,8 +363,9 @@ export function buildWorld(scene, tex, data, quality) {
       const v = gridToLocal(1.55 + Math.cos(t) * 1.05, 91.2 + Math.sin(t) * 5.0);
       res.push([v.x, v.z]);
     }
-    const rm = mat(S.water, { uTime, uUnitsPerM: { value: upmN }, uZenith, ...F }, flat());
+    const rm = mat(S.water, { uTime, uUnitsPerM: { value: upmN }, uZenith, ...reflectU, ...F }, flat());
     const reservoir = shapeMesh([res], rm, -0.1);
+    world.waterMeshes.push(reservoir);
     reservoir.renderOrder = -6;
     nyc.add(reservoir);
   }
@@ -277,6 +376,7 @@ export function buildWorld(scene, tex, data, quality) {
 
   // ---- Manhattan buildings -------------------------------------------------
   const nycBoxes = new BoxBatch();
+  const tanks = [];
   const r = rng(1811);
   const reserved = [];
   const isReserved = (x, z, rad) => reserved.some(([rx, rz, rr]) => Math.hypot(x - rx, z - rz) < rr + rad);
@@ -362,7 +462,7 @@ export function buildWorld(scene, tex, data, quality) {
           const d = ((blockS - 2 * insetS) / rows) * (0.84 + r() * 0.12);
           let h = towerBlock ? hBlock * (0.8 + r() * 0.5) : nycHeight(lat, lon, s) * (0.6 + r() * 0.5);
           h = Math.max(10, h) * upmN;
-          nycBoxes.add(x, z, w, d, h, gridAngle, r(), h / upmN > 140 ? 1 : 0);
+          massing(nycBoxes, r, x, z, w, d, h, gridAngle, h / upmN > 140 ? (r() < 0.8 ? 1 : 0) : (r() < 0.08 ? 1 : 0), upmN, -1, tanks);
         }
       }
     }
@@ -381,7 +481,7 @@ export function buildWorld(scene, tex, data, quality) {
         const ll = { lat: 40.735 + (-(z) / (110570 * upmN)), lon: -73.99 + x / (111320 * Math.cos(40.73 * Math.PI / 180) * upmN) };
         const h = nycHeight(ll.lat, ll.lon, 0) * (0.5 + r() * 0.6);
         if (r() < 0.12) continue;
-        nycBoxes.add(x + (r() - 0.5) * step * 0.3, z + (r() - 0.5) * step * 0.3, step * (0.6 + r() * 0.3), step * (0.6 + r() * 0.3), Math.max(9, h) * upmN, rot, r(), h > 140 ? 1 : 0);
+        massing(nycBoxes, r, x + (r() - 0.5) * step * 0.3, z + (r() - 0.5) * step * 0.3, step * (0.6 + r() * 0.3), step * (0.6 + r() * 0.3), Math.max(9, h) * upmN, rot, h > 140 ? 1 : 0, upmN, -1, tanks);
       }
     }
   }
@@ -399,13 +499,37 @@ export function buildWorld(scene, tex, data, quality) {
         let h = 9 + r() * 14;
         for (const [la, lo, rad, hh] of clusters) h += hh * Math.exp(-((distM(ll.lat, ll.lon, la, lo) / rad) ** 2)) * Math.exp(gauss(r) * 0.4);
         const rot = Math.floor(x / (6 * step)) * 0.37 + Math.floor(z / (6 * step)) * 0.21;
-        nycBoxes.add(x + (r() - 0.5) * step * 0.3, z + (r() - 0.5) * step * 0.3, step * (0.45 + r() * 0.3), step * (0.45 + r() * 0.35), h * upmN, rot, r(), h > 120 ? 1 : 0);
+        massing(nycBoxes, r, x + (r() - 0.5) * step * 0.3, z + (r() - 0.5) * step * 0.3, step * (0.45 + r() * 0.3), step * (0.45 + r() * 0.35), h * upmN, rot, h > 120 ? 1 : 0, upmN, -1, h < 60 ? tanks : null);
       }
     }
   }
   const bUniforms = { uTime, uUnitsPerM: { value: upmN }, uHot: { value: -1 }, uHotOn: { value: 0 }, uZenith, ...F };
   const nycBuildings = nycBoxes.mesh(mat(S.buildings, bUniforms));
   nyc.add(nycBuildings);
+  // Rooftop water tanks: wooden barrels on steel stands, the New York signature.
+  {
+    const tank = new CylinderGeometry(0.5, 0.5, 0.9, 10, 1, false).toNonIndexed();
+    tank.translate(0, 0.95, 0);
+    const cap = new CylinderGeometry(0.0, 0.56, 0.38, 10, 1, true).toNonIndexed();
+    cap.translate(0, 1.59, 0);
+    const legs = new BoxGeometry(0.8, 0.5, 0.8).toNonIndexed();
+    legs.translate(0, 0.25, 0);
+    const parts = [tank, cap, legs];
+    const n = parts.reduce((a, g) => a + g.attributes.position.count, 0);
+    const pos = new Float32Array(n * 3), nor = new Float32Array(n * 3), part = new Float32Array(n);
+    let o = 0;
+    parts.forEach((g, i) => { pos.set(g.attributes.position.array, o * 3); nor.set(g.attributes.normal.array, o * 3); part.fill(i, o, o + g.attributes.position.count); o += g.attributes.position.count; });
+    const geo = new BufferGeometry();
+    geo.setAttribute('position', new BufferAttribute(pos, 3));
+    geo.setAttribute('normal', new BufferAttribute(nor, 3));
+    geo.setAttribute('aPart', new BufferAttribute(part, 1));
+    const inst = new InstancedMesh(geo, mat(S.tanks, { uUnitsPerM: { value: upmN }, uZenith, ...F }), Math.max(1, tanks.length));
+    const ob = new Object3D();
+    tanks.forEach(([x, z, y, sz, sd], i) => { ob.position.set(x, y, z); ob.rotation.set(0, sd * 6, 0); ob.scale.set(sz, sz * 1.15, sz); ob.updateMatrix(); inst.setMatrixAt(i, ob.matrix); });
+    inst.count = tanks.length;
+    inst.frustumCulled = false;
+    nyc.add(inst);
+  }
   world.nycBuildings = { mesh: nycBuildings, uniforms: bUniforms, count: nycBoxes.items.length };
 
   // ---- Bridges ---------------------------------------------------------------
@@ -546,14 +670,6 @@ export function buildWorld(scene, tex, data, quality) {
     pool.position.set(0, 40, 0);
     pool.scale.setScalar(120);
     statue.add(pool);
-    // Liberty Island is a park, not city streets
-    {
-      const lawn = [];
-      for (let i = 0; i < 32; i++) { const t = (i / 32) * Math.PI * 2; lawn.push([base.x + Math.cos(t) * 190 * upmN, base.z + Math.sin(t) * 150 * upmN]); }
-      const lm = shapeMesh([lawn], groundMat(2, 1, '#ffd9a0'), -0.12);
-      lm.renderOrder = -6;
-      nyc.add(lm);
-    }
     // Glows go in an unrotated twin group so they can face the camera.
     const glows = new Group();
     glows.position.copy(statue.position);
@@ -621,7 +737,7 @@ export function buildWorld(scene, tex, data, quality) {
     return u * u + w * w < 1;
   });
   {
-    const lm = mat(S.water, { uTime, uUnitsPerM: { value: upmO }, uZenith, ...F }, flat());
+    const lm = mat(S.water, { uTime, uUnitsPerM: { value: upmO }, uZenith, ...reflectU, ...F }, flat());
     for (const l of lakeList) {
       const pts = [];
       const n = 40, seed = ro() * 10;
@@ -635,6 +751,7 @@ export function buildWorld(scene, tex, data, quality) {
       const m = shapeMesh([pts], lm, -0.15);
       m.renderOrder = -7;
       orl.add(m);
+      world.waterMeshes.push(m);
     }
   }
   // Roads: I-4 and the arterials around the Winter Springs office.
@@ -656,7 +773,7 @@ export function buildWorld(scene, tex, data, quality) {
       const pl = pts.map(([la, lo]) => LO(la, lo));
       const curve = new CatmullRomCurve3(pl);
       const smooth = curve.getPoints(pl.length * 12);
-      const m = new Mesh(ribbonGeometry(smooth, widthM * upmO, 0.03), mat(S.ribbon, { uColor: { value: new Color('#ffb066') }, uIntensity: { value: widthM > 30 ? 1.1 : 0.7 }, uTime, uDash: { value: 0 }, uDraw: { value: 1 }, uFogOn: { value: 1 }, ...F }, additive));
+      const m = new Mesh(ribbonGeometry(smooth, widthM * upmO, 0.03), mat(S.ribbon, { uColor: { value: new Color('#ffb066') }, uIntensity: { value: widthM > 30 ? 0.75 : 0.45 }, uTime, uDash: { value: 0 }, uDraw: { value: 1 }, uFogOn: { value: 1 }, ...F }, additive));
       m.frustumCulled = false;
       orl.add(m);
       for (let i = 1; i < smooth.length; i++) {
@@ -676,8 +793,10 @@ export function buildWorld(scene, tex, data, quality) {
     return Math.hypot(x - a.x - abx * t, z - a.z - abz * t) < m;
   });
 
-  // Downtown Orlando
+  // Downtown Orlando: west of Lake Eola (the park ring around the lake and Thornton Park stay low).
+  const eola = LO(28.5434, -81.3725);
   const orlBoxes = new BoxBatch();
+  orlBoxes.florida = true;
   {
     const core = LO(28.5415, -81.3795);
     const step = 60 * upmO;
@@ -686,10 +805,11 @@ export function buildWorld(scene, tex, data, quality) {
       for (let z = core.z - 16 * step; z < core.z + 16 * step; z += step) {
         const d = Math.hypot(x - core.x, z - core.z) / upmO;
         if (d > 1300 || inLake(x, z, 25 * upmO) || nearRoad(x, z, 30 * upmO) || ro() < 0.3) continue;
+        if (x > eola.x + 120 * upmO || Math.hypot(x - eola.x, z - eola.z) < 260 * upmO) continue; // Thornton Park and the lake park
         const towerish = Math.exp(-((d / 420) ** 2));
         let h = 8 + ro() * 18 + towerish * 120 * Math.exp(gauss(ro) * 0.45);
         h = Math.min(h, 140);
-        orlBoxes.add(x + (ro() - 0.5) * step * 0.08, z + (ro() - 0.5) * step * 0.08, step * (0.55 + ro() * 0.25), step * (0.55 + ro() * 0.25), h * upmO, 0, ro(), h > 70 ? 1 : 0);
+        massing(orlBoxes, ro, x + (ro() - 0.5) * step * 0.08, z + (ro() - 0.5) * step * 0.08, step * (0.55 + ro() * 0.25), step * (0.55 + ro() * 0.25), h * upmO, 0, h > 60 && ro() < 0.75 ? 1 : 3, upmO);
       }
     }
   }
@@ -728,14 +848,19 @@ export function buildWorld(scene, tex, data, quality) {
   }
 
   // Neighbourhoods: homes facing lamp-lit streets, backyard pools, trees.
-  const houseList = [], poolList = [], treeList = [];
+  const houseList = [], poolList = [], treeList = [], palmList = [];
   const parcelLines = [];
   const streetQuads = []; // [x0, z0, x1, z1, widthUnits]
-  const addHome = (x, z, w, d, h, rot, backX, backZ, lotW) => {
+  // A tree on a lot: a live oak, or (in the newer subdivisions) often a palm.
+  const plant = (x, z, oakR, palmShare) => {
+    if (ro() < palmShare) palmList.push([x, z, (8 + ro() * 6) * upmO, ro()]);
+    else treeList.push([x, z, oakR * upmO, ro()]);
+  };
+  const addHome = (x, z, w, d, h, rot, backX, backZ, lotW, oaks = 1, palmShare = 0.35) => {
     houseList.push([x, z, w, d, h, rot, ro()]);
     if (ro() < 0.28) poolList.push([x + backX * 0.55, z + backZ * 0.55, 8 * upmO, 4.5 * upmO, rot, ro()]);
-    if (ro() < 0.6) treeList.push([x + backX * 0.95 + (ro() - 0.5) * lotW * 0.6, z + backZ * 0.95 + (ro() - 0.5) * lotW * 0.6, (5 + ro() * 5) * upmO, ro()]);
-    if (ro() < 0.25) treeList.push([x - backX * 0.75 + (ro() - 0.5) * lotW * 0.6, z - backZ * 0.75 + (ro() - 0.5) * lotW * 0.6, (4 + ro() * 3) * upmO, ro()]);
+    if (ro() < 0.65) plant(x + backX * 0.95 + (ro() - 0.5) * lotW * 0.6, z + backZ * 0.95 + (ro() - 0.5) * lotW * 0.6, (5 + ro() * 5) * oaks, palmShare);
+    if (ro() < 0.4) plant(x - backX * 0.8 + (ro() - 0.5) * lotW * 0.6, z - backZ * 0.8 + (ro() - 0.5) * lotW * 0.6, (4 + ro() * 3.5) * oaks, palmShare * 1.3);
   };
   const hoods = [
     [28.6555, -81.2605, low ? 1300 : 1900, low ? 0.55 : 0.8], // Winter Springs, around the office
@@ -743,7 +868,11 @@ export function buildWorld(scene, tex, data, quality) {
     [28.6720, -81.2330, low ? 600 : 1000, 0.55],
     [28.5650, -81.3920, low ? 600 : 900, 0.6],  // College Park
     [28.5240, -81.3620, low ? 500 : 800, 0.55],
+    [28.5428, -81.3645, low ? 600 : 820, 0.8],  // Thornton Park, east of Lake Eola
+    [28.5545, -81.3690, low ? 400 : 550, 0.7],  // Lake Eola Heights
+    [28.5432, -81.3683, 420, 0.85],             // Eola Drive / Summerlin, facing the park
   ];
+  const downtownCore = LO(28.5415, -81.3795);
   {
     const lotW = 22 * upmO, lotD = 34 * upmO, gapM = 14 * upmO;
     const band = lotD * 2 + gapM;          // street, two rows of homes back to back, next street
@@ -777,8 +906,10 @@ export function buildWorld(scene, tex, data, quality) {
                 const lz = mid + side * (lotD / 2 + 2 * upmO);
                 const [x, z] = W2(lx, lz);
                 if (inLake(x, z, 16 * upmO) || nearRoad(x, z, 24 * upmO)) continue;
+                if (x < eola.x + 120 * upmO && Math.hypot(x - downtownCore.x, z - downtownCore.z) < 1150 * upmO) continue;
+                if (Math.hypot(x - eola.x, z - eola.z) < 250 * upmO) continue;
                 const back = W2(lx, mid);
-                addHome(x, z, (11 + ro() * 5) * upmO, (9 + ro() * 4) * upmO, (ro() < 0.3 ? 7.5 : 4.6) * upmO, -ang, back[0] - x, back[1] - z, lotW);
+                addHome(x, z, (12 + ro() * 6) * upmO, (10 + ro() * 4) * upmO, (ro() < 0.3 ? 6.0 : 3.3) * upmO, -ang, back[0] - x, back[1] - z, lotW);
               }
             }
           }
@@ -801,13 +932,31 @@ export function buildWorld(scene, tex, data, quality) {
             const cxL = x + bw * (col === 0 ? 0.27 : 0.73), czL = z + (bh * (i + 0.5)) / n;
             if (inLake(cxL, czL, 12 * upmO) || ro() < 0.08) continue;
             const backX = (x + bw / 2 - cxL) * 0.9;
-            addHome(cxL, czL, (bw / 2) * 0.42, (bh / n) * 0.6, (ro() < 0.3 ? 7.5 : 4.6) * upmO, 0, backX, 0, (bh / n));
+            addHome(cxL, czL, (bw / 2) * 0.42, (bh / n) * 0.6, (ro() < 0.25 ? 6.0 : 3.3) * upmO, 0, backX, 0, (bh / n), 1.5, 0.12);
           }
         }
       }
     }
     world.parcelCenter = pc;
     world.parcelGrid = { origin: new Vector3(x0, 0, z0), bw: 130, bh: 210, span: 1040 };
+  }
+  // Lake Eola Park: a lawn ring with oaks and palms around the lake.
+  {
+    const ring = [];
+    for (let i = 0; i < 48; i++) { const t = (i / 48) * Math.PI * 2; ring.push([eola.x + Math.cos(t) * 255 * upmO, eola.z + Math.sin(t) * 235 * upmO]); }
+    const pm = mat(S.ground, {
+      uMode: { value: 2 }, uGridInv: { value: new Float32Array(4) }, uGridOrigin: { value: new Vector2() },
+      uUnitsPerM: { value: upmO }, uStreetCol: { value: new Color('#ffd9a0') }, uDensity: { value: 1 }, uTime, ...districtUniforms(), ...F,
+    }, flat());
+    const park = shapeMesh([ring], pm, -0.18);
+    park.renderOrder = -7.5;
+    orl.add(park);
+  }
+  for (let i = 0; i < 70; i++) {
+    const t = ro() * Math.PI * 2, rr = (185 + ro() * 60) * upmO;
+    const x = eola.x + Math.cos(t) * rr, z = eola.z + Math.sin(t) * rr * 0.92;
+    if (inLake(x, z, 8 * upmO)) continue;
+    if (ro() < 0.35) palmList.push([x, z, (9 + ro() * 5) * upmO, ro()]); else treeList.push([x, z, (6 + ro() * 6) * upmO, ro()]);
   }
   // Streets for the neighbourhoods, split into short pieces so none run across a lake.
   {
@@ -872,36 +1021,40 @@ export function buildWorld(scene, tex, data, quality) {
     m.frustumCulled = false;
     orl.add(m);
   }
-  // Homes geometry: a box body with a gable roof (roof triangles carry uv.y = 2).
+  // Homes: walls and hip roofs as two instanced meshes, then pools, oaks and palms.
   {
-    const body = new BoxGeometry(1, 1, 1).toNonIndexed();
-    body.translate(0, 0.5, 0);
-    const bp = body.attributes.position.array, bn = body.attributes.normal.array;
-    const roofP = [
-      -0.55, 1, -0.55, 0.55, 1, -0.55, 0, 1.55, -0.55,  0.55, 1, 0.55, -0.55, 1, 0.55, 0, 1.55, 0.55,
-      -0.55, 1, -0.55, 0, 1.55, -0.55, 0, 1.55, 0.55,  -0.55, 1, -0.55, 0, 1.55, 0.55, -0.55, 1, 0.55,
-      0.55, 1, -0.55, 0.55, 1, 0.55, 0, 1.55, 0.55,  0.55, 1, -0.55, 0, 1.55, 0.55, 0, 1.55, -0.55,
-    ];
-    const pos = new Float32Array(bp.length + roofP.length);
-    pos.set(bp); pos.set(roofP, bp.length);
-    const uv = new Float32Array((pos.length / 3) * 2);
-    for (let i = bp.length / 3; i < pos.length / 3; i++) uv[i * 2 + 1] = 2;
-    const g = new BufferGeometry();
-    g.setAttribute('position', new BufferAttribute(pos, 3));
-    g.setAttribute('uv', new BufferAttribute(uv, 2));
-    g.computeVertexNormals();
-    const nHouse = houseList.length;
-    const hm = mat(S.houses, { uTime, uZenith, ...F });
-    const inst = new InstancedMesh(g, hm, Math.max(1, nHouse));
-    const seeds = new Float32Array(nHouse);
     const o = new Object3D();
-    houseList.forEach(([x, z, w, d, h, rot, seed], i) => {
+    const nHouse = houseList.length;
+    const hu = { uTime, uZenith, uUnitsPerM: { value: upmO }, ...F };
+    const hm = mat(S.houses, hu);
+    const seeds = new Float32Array(nHouse);
+    houseList.forEach((hh, i) => { seeds[i] = hh[6]; });
+    // walls
+    const body = new BoxGeometry(1, 1, 1);
+    body.translate(0, 0.5, 0);
+    body.setAttribute('aSeed', new InstancedBufferAttribute(seeds, 1));
+    const walls = new InstancedMesh(body, hm, Math.max(1, nHouse));
+    // hip roof: ridge along x, eaves overhanging the walls
+    const rp = [
+      [-0.5, 0, -0.5], [0.5, 0, -0.5], [0.5, 0, 0.5], [-0.5, 0, 0.5], [-0.18, 1, 0], [0.18, 1, 0],
+    ];
+    const tri = [[0, 5, 1], [0, 4, 5], [2, 5, 4], [2, 4, 3], [1, 5, 2], [3, 4, 0], [0, 1, 2], [0, 2, 3]];
+    const roofPos = new Float32Array(tri.length * 9);
+    tri.forEach((t, i) => t.forEach((vi, j) => roofPos.set(rp[vi], i * 9 + j * 3)));
+    const roofGeo = new BufferGeometry();
+    roofGeo.setAttribute('position', new BufferAttribute(roofPos, 3));
+    roofGeo.setAttribute('uv', new BufferAttribute(new Float32Array((roofPos.length / 3) * 2).map((_, i) => (i % 2 ? 2 : 0)), 2));
+    roofGeo.computeVertexNormals();
+    roofGeo.setAttribute('aSeed', new InstancedBufferAttribute(seeds, 1));
+    const roofs = new InstancedMesh(roofGeo, hm, Math.max(1, nHouse));
+    houseList.forEach(([x, z, w, d, h, rot], i) => {
       o.position.set(x, 0, z); o.rotation.set(0, rot, 0); o.scale.set(w, h, d); o.updateMatrix();
-      inst.setMatrixAt(i, o.matrix); seeds[i] = seed;
+      walls.setMatrixAt(i, o.matrix);
+      o.position.set(x, h, z); o.scale.set(w * 1.08, Math.min(w, d) * 0.36, d * 1.12); o.updateMatrix();
+      roofs.setMatrixAt(i, o.matrix);
     });
-    g.setAttribute('aSeed', new InstancedBufferAttribute(seeds, 1));
-    inst.frustumCulled = false;
-    orl.add(inst);
+    walls.frustumCulled = roofs.frustumCulled = false;
+    orl.add(walls, roofs);
 
     const pg = new PlaneGeometry(1, 1); pg.rotateX(-Math.PI / 2);
     const pinst = new InstancedMesh(pg, mat(S.pools, { uTime, ...F }), Math.max(1, poolList.length));
@@ -911,13 +1064,59 @@ export function buildWorld(scene, tex, data, quality) {
     pinst.frustumCulled = false;
     orl.add(pinst);
 
-    const tg = new IcosahedronGeometry(1, 0);
+    // live oaks: broad, lumpy canopies on short trunks
+    const tg = new IcosahedronGeometry(1, 2);
     const tinst = new InstancedMesh(tg, mat(S.trees, { uZenith, ...F }), Math.max(1, treeList.length));
     const tseeds = new Float32Array(treeList.length);
-    treeList.forEach(([x, z, rad, seed], i) => { o.position.set(x, rad * 0.9, z); o.rotation.set(seed * 3, seed * 7, 0); o.scale.set(rad, rad * 0.85, rad); o.updateMatrix(); tinst.setMatrixAt(i, o.matrix); tseeds[i] = seed; });
+    treeList.forEach(([x, z, rad, seed], i) => { o.position.set(x, rad * 0.75, z); o.rotation.set(0, seed * 7, 0); o.scale.set(rad, rad * 0.62, rad); o.updateMatrix(); tinst.setMatrixAt(i, o.matrix); tseeds[i] = seed; });
     tg.setAttribute('aSeed', new InstancedBufferAttribute(tseeds, 1));
     tinst.frustumCulled = false;
     orl.add(tinst);
+
+    // palms: a slender trunk and a crown of drooping fronds (unit height)
+    {
+      const pos = [], nor = [], part = [];
+      const push = (a, n, pt) => { pos.push(...a); nor.push(...n); part.push(pt); };
+      const sides = 5;
+      for (let i = 0; i < sides; i++) {
+        const a0 = (i / sides) * Math.PI * 2, a1 = ((i + 1) / sides) * Math.PI * 2;
+        const r0 = 0.032, r1 = 0.022;
+        const p = (a, r, y) => [Math.cos(a) * r + y * y * 0.05, y, Math.sin(a) * r];
+        const n0 = [Math.cos(a0), 0, Math.sin(a0)], n1 = [Math.cos(a1), 0, Math.sin(a1)];
+        push(p(a0, r0, 0), n0, 0); push(p(a1, r0, 0), n1, 0); push(p(a1, r1, 0.9), n1, 0);
+        push(p(a0, r0, 0), n0, 0); push(p(a1, r1, 0.9), n1, 0); push(p(a0, r1, 0.9), n0, 0);
+      }
+      const top = [0.04, 0.9, 0];
+      const fronds = 9;
+      for (let f = 0; f < fronds; f++) {
+        const a = (f / fronds) * Math.PI * 2 + (f % 2) * 0.2;
+        const dx = Math.cos(a), dz = Math.sin(a);
+        const seg = 4;
+        const pt = (t) => [top[0] + dx * t * 0.42, top[1] + 0.08 * Math.sin(t * Math.PI * 0.6) - 0.22 * t * t, top[2] + dz * t * 0.42];
+        for (let k = 0; k < seg; k++) {
+          const t0 = k / seg, t1 = (k + 1) / seg;
+          const w0 = 0.07 * Math.sin(Math.PI * Math.min(0.95, t0 + 0.08)), w1 = 0.07 * Math.sin(Math.PI * Math.min(0.95, t1 + 0.08));
+          const A = pt(t0), B = pt(t1);
+          const sx = -dz, sz = dx;
+          const q = [[A[0] + sx * w0, A[1] - 0.02, A[2] + sz * w0], [A[0] - sx * w0, A[1] - 0.02, A[2] - sz * w0], [B[0] + sx * w1, B[1] - 0.02, B[2] + sz * w1], [B[0] - sx * w1, B[1] - 0.02, B[2] - sz * w1]];
+          const n = [0, 1, 0];
+          push(q[0], n, 1); push(q[2], n, 1); push(A, n, 1);
+          push(A, n, 1); push(q[2], n, 1); push(B, n, 1);
+          push(q[1], n, 1); push(A, n, 1); push(q[3], n, 1);
+          push(A, n, 1); push(B, n, 1); push(q[3], n, 1);
+        }
+      }
+      const g = new BufferGeometry();
+      g.setAttribute('position', new Float32BufferAttribute(pos, 3));
+      g.setAttribute('normal', new Float32BufferAttribute(nor, 3));
+      g.setAttribute('aPart', new Float32BufferAttribute(part, 1));
+      const ps = new Float32Array(palmList.length);
+      const pinst2 = new InstancedMesh(g, mat(S.palms, { uTime, uZenith, ...F }, { side: DoubleSide }), Math.max(1, palmList.length));
+      palmList.forEach(([x, z, hgt, seed], i) => { o.position.set(x, 0, z); o.rotation.set(0, seed * 6.28, 0); o.scale.setScalar(hgt); o.updateMatrix(); pinst2.setMatrixAt(i, o.matrix); ps[i] = seed; });
+      g.setAttribute('aSeed', new InstancedBufferAttribute(ps, 1));
+      pinst2.frustumCulled = false;
+      orl.add(pinst2);
+    }
     world.homeCount = nHouse;
   }
   const orlUniforms = { uTime, uUnitsPerM: { value: upmO }, uHot: { value: -1 }, uHotOn: { value: 0 }, uZenith, ...F };
@@ -934,7 +1133,7 @@ export function buildWorld(scene, tex, data, quality) {
       fragmentShader: `uniform float uOn; uniform vec3 uPointer; uniform float uPointerOn; uniform vec3 uCenter; uniform float uSpan; varying vec3 vP;
         void main(){ float d = length(vP.xz - uPointer.xz); float near = exp(-d*d/(uSpan*uSpan*0.012)) * uPointerOn;
           float edge = 1.0 - smoothstep(0.6, 1.0, length(vP.xz - uCenter.xz) / uSpan);
-          vec3 c = mix(vec3(0.42,0.6,1.0), vec3(1.0,0.82,0.55), near) * (1.3 + near * 2.5);
+          vec3 c = mix(vec3(0.42,0.6,1.0), vec3(1.0,0.82,0.55), near) * (0.32 + near * 3.0);
           gl_FragColor = vec4(c * uOn * edge, 1.0); }`,
       uniforms: { uOn: { value: 0 }, uPointer: { value: new Vector3(1e6, 0, 1e6) }, uPointerOn: { value: 0 }, uCenter: { value: new Vector3().copy(world.parcelCenter).add(CO) }, uSpan: { value: 1100 * upmO } },
       ...additive,
@@ -1003,7 +1202,7 @@ export function buildWorld(scene, tex, data, quality) {
     world.clouds = cm;
   }
 
-  world.stats = { orlBuildings: orlBoxes.items.length, trees: treeList.length, pools: poolList.length, streets: streetQuads.length, lakes: lakeList.length };
+  world.stats = { orlBuildings: orlBoxes.items.length, trees: treeList.length, palms: palmList.length, pools: poolList.length, streets: streetQuads.length, lakes: lakeList.length };
   world.nyc = { group: nyc, upm: upmN, L, center: CN };
   world.orl = { group: orl, upm: upmO, L: LO, center: CO };
   return world;

@@ -101,6 +101,11 @@ Everything you see is generated for this site from open geographic data. There a
 - **Orlando:** Lake Eola, I-4, SR 408, SR 436, SR 417, SR 434, Red Bug Lake Road, Tuskawilla Road and
   some twenty named lakes are placed from their real positions; downtown towers, neighbourhoods, homes,
   pools and trees are generated around them.
+- **Look:** a blue-hour light model. Buildings get real materials (limestone, brick, concrete, stucco and
+  glass curtain walls), setbacks, rooftop plant and New York water tanks; windows are lit room by room and
+  office floor by floor, and far away they light up in clusters so the skyline still sparkles. Homes have
+  hip roofs, porch lights, oaks and palms. The harbour, the rivers and the lakes reflect the scene (a mirrored
+  camera renders it at reduced size each frame; add `?noreflect` to the address to compare).
 - **East Coast map:** Natural Earth coastlines (public domain), US Census state lines, and real towns
   from GeoNames (CC BY 4.0, credited in the footer).
 - The office locations are approximate: 5th Ave & 30th St in New York, and Red Bug Lake Rd & Tuskawilla Rd
@@ -157,7 +162,8 @@ point the form at a form service and add that service to `form-action` and `conn
 ## Performance and accessibility
 
 - Phones and low-power computers automatically get a lighter map, fewer buildings and homes, and no anti-aliasing.
-  The site also watches its own frame rate for the first few seconds and lowers resolution if needed.
+  The site also watches its own frame rate for the first few seconds and, if needed, makes the water
+  reflections cheaper, then turns them off, then lowers resolution.
 - Rendering pauses when the tab is hidden.
 - `prefers-reduced-motion` switches off parallax, the opening descent, moving film grain, text animations and counters.
 - Without WebGL a still image of the skyline is shown.

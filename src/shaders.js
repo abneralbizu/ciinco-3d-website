@@ -36,6 +36,25 @@ const HASH = /* glsl */ `
   float fbm(vec2 p) { float s = 0.0, a = 0.5; for (int i = 0; i < 5; i++) { s += a * vnoise(p); p = p * 2.03 + 17.1; a *= 0.5; } return s; }
 `;
 
+// Blue-hour light: dim sky from above, the last warm light low in the west,
+// and the warm glow of the streets bouncing up the lower floors.
+const NIGHT = /* glsl */ `
+  vec3 skyEnv(vec3 R) {
+    vec3 hor = hazeColor(R) * 0.8 + vec3(0.006, 0.008, 0.02);
+    vec3 skyc = mix(hor, uZenith * 2.0 + vec3(0.003, 0.004, 0.012), smoothstep(0.02, 0.6, R.y));
+    vec3 city = vec3(0.018, 0.012, 0.009);
+    return R.y > 0.0 ? skyc : mix(hor * 0.7, city, smoothstep(0.0, -0.25, R.y));
+  }
+  vec3 nightLight(vec3 N, float yM) {
+    vec3 sky = mix(vec3(0.050, 0.060, 0.115), vec3(0.075, 0.090, 0.17), max(N.y, 0.0));
+    vec2 sd = normalize(uSunDir.xz + 1e-5);
+    float west = max(dot(normalize(N.xz + 1e-5), sd), 0.0) * (1.0 - abs(N.y));
+    vec3 dusk = vec3(0.30, 0.14, 0.07) * pow(west, 1.5) * 0.35;
+    vec3 street = vec3(0.13, 0.08, 0.04) * exp(-max(yM, 0.0) / 12.0) * (1.0 - max(N.y, 0.0));
+    return sky + dusk + street;
+  }
+`;
+
 const WORLD_VERT = /* glsl */ `
   varying vec3 vP;
   varying vec3 vN;
@@ -78,6 +97,7 @@ export const sky = {
       float facing = max(dot(a, b), 0.0);
       float band = exp(-max(h, 0.0) * 9.0) * smoothstep(-0.25, 0.02, h);
       col += uGlow * band * (0.06 + pow(facing, 6.0) * 0.6);
+      col += vec3(0.075, 0.045, 0.03) * exp(-max(h, 0.0) * 14.0) * smoothstep(-0.06, 0.0, h);   // city glow on the haze
       // below the horizon: deep haze
       col = mix(col, uHorizon * 0.55, smoothstep(0.0, -0.2, h));
       // stars, fading in toward the zenith
@@ -155,11 +175,13 @@ export const ground = {
     float road(float across, float along, float w) {
       float d = abs(fract(across + 0.5) - 0.5);
       float fw = fwidth(across);
-      float onRoad = smoothstep(w + fw, max(w - fw, 0.0), d);
+      // far away (or at grazing angles) a road covers its true share of the ground, no more
+      float far = clamp(fw * 1.5 - 0.1, 0.0, 1.0);
+      float onRoad = mix(smoothstep(w + fw, max(w - fw, 0.0), d), 2.0 * w, far);
       float lampF = fract(along + 0.5) - 0.5;
-      float lamp = smoothstep(0.22, 0.0, abs(lampF)) * smoothstep(w * 1.4 + fw, 0.0, d);
-      float blur = clamp(fwidth(along) * 1.5 - 0.3, 0.0, 1.0);
-      return onRoad * 0.10 + mix(lamp, onRoad * 0.32, blur);
+      float lamp = smoothstep(0.13, 0.0, abs(lampF)) * smoothstep(w * 1.4 + fw, 0.0, d);
+      float blur = max(clamp(fwidth(along) * 1.5 - 0.3, 0.0, 1.0), far);
+      return onRoad * 0.035 + mix(lamp * 0.75, onRoad * 0.17, blur);
     }
     void main() {
       vec2 p = vP.xz;
@@ -167,13 +189,17 @@ export const ground = {
       vec3 col = vec3(0.012, 0.013, 0.020);
       float glow = 0.0;
       if (uMode > 1.5) {
-        col = vec3(0.006, 0.013, 0.009) * (0.8 + 0.4 * fbm(p * m * 0.01));
-        vec2 q = p * m / 60.0;
-        float lamp = step(0.93, hash12(floor(q))) * smoothstep(0.2, 0.0, length(fract(q) - 0.5));
-        glow += lamp * 0.7;
+        float n = fbm(p * m * 0.012);
+        col = mix(vec3(0.008, 0.016, 0.010), vec3(0.012, 0.022, 0.013), n);          // lawns and canopy
+        col = mix(col, vec3(0.004, 0.009, 0.006), smoothstep(0.55, 0.75, fbm(p * m * 0.03 + 3.0)));
+        vec2 q = p * m / 38.0;
+        float lamp = step(0.86, hash12(floor(q))) * smoothstep(0.16, 0.0, length(fract(q) - 0.5));
+        glow += lamp * 0.45;
       } else if (uMode > 0.5) {
-        vec2 g = uGridInv * (p - uGridOrigin);
-        float onGrid = smoothstep(0.0, 2.0, g.y);
+        vec2 g = uGridInv * (p - uGridOrigin);          // x: avenue, y: street - 59
+        float sR = g.y + 59.0;
+        // the 1811 grid everywhere except below Houston St and in the West Village
+        float onGrid = 1.0 - max(smoothstep(1.5, -0.5, sR), smoothstep(14.0, 12.5, sR) * smoothstep(0.8, 1.3, g.x));
         float avc = g.x >= 0.0 ? g.x : g.x / 0.47;
         // avenues run along the street axis: lamps every 40 m (half a street block)
         float av = road(avc, g.y * 2.0, g.x >= 0.0 ? 0.045 : 0.09);
@@ -184,7 +210,11 @@ export const ground = {
         mat2 rot = mat2(cos(ang), -sin(ang), sin(ang), cos(ang));
         vec2 rr = rot * r;
         float old = max(road(rr.x, rr.y * 2.5, 0.07), road(rr.y * 0.6, rr.x * 3.0, 0.05));
-        glow += mix(old, grid, onGrid);
+        float pier = smoothstep(7.0, 7.15, g.x) * onGrid;
+        vec2 pq = p * m / 30.0;
+        float pierLamp = step(0.93, hash12(floor(pq))) * smoothstep(0.18, 0.0, length(fract(pq) - 0.5)) * 0.4;
+        glow += mix(mix(old, grid, onGrid), pierLamp, pier);
+        col = mix(col, vec3(0.018, 0.018, 0.022), pier);
       } else {
         vec2 q = p * m;
         vec2 cell = floor(q / 900.0);
@@ -199,12 +229,14 @@ export const ground = {
         float gen = minor * d * (1.0 - hood) + major * (0.45 + 0.4 * d) * (1.0 - hood * 0.7);
         // aligned districts (downtown Orlando, the parcel map)
         vec2 a = (q - uAlignA.xy) / uAlignAS;
-        float inA = smoothstep(uAlignA.z, uAlignA.z * 0.9, length(q - uAlignA.xy));
+        float inA = smoothstep(uAlignA.z, uAlignA.z * 0.9, length(q - uAlignA.xy)) * (1.0 - hood);
         float alA = max(road(a.x, a.y * uAlignAS.y / 30.0, 0.05), road(a.y, a.x * uAlignAS.x / 30.0, 0.035));
         vec2 b = (q - uAlignBO) / uAlignBS;
         float inB = smoothstep(uAlignB.z, uAlignB.z * 0.9, max(abs(q.x - uAlignB.x), abs(q.y - uAlignB.y)));
         float alB = max(road(b.x, b.y * uAlignBS.y / 30.0, 0.04), road(b.y, b.x * uAlignBS.x / 30.0, 0.03));
         glow += mix(mix(gen, alA * 0.8, inA), alB * 0.8, inB);
+        float lawn = max(hood, inB);
+        col = mix(col, mix(vec3(0.010, 0.017, 0.011), vec3(0.016, 0.022, 0.014), fbm(q / 40.0)), lawn * 0.9);
       }
       col += uStreetCol * glow;
       gl_FragColor = vec4(applyFog(col, vP), uDetail);
@@ -221,23 +253,45 @@ export const water = {
     uniform float uTime;
     uniform float uUnitsPerM;
     uniform vec3 uZenith;
+    uniform sampler2D uReflect;   // the scene mirrored in the water plane
+    uniform mat4 uReflectMat;
+    uniform float uReflectOn;
+    uniform float uMirrorY;
     ${FOG}
     ${HASH}
     varying vec3 vP;
     void main() {
       vec2 q = vP.xz / uUnitsPerM;
-      vec2 n2 = vec2(fbm(q / 60.0 + uTime * 0.05) - 0.5, fbm(q / 60.0 + 9.0 - uTime * 0.04) - 0.5);
-      vec3 N = normalize(vec3(n2.x * 0.35, 1.0, n2.y * 0.35));
+      float t = uTime;
+      // wind ripples: a slow swell and a fine chop, the chop stretched across the view
+      vec2 n1 = vec2(fbm(q / 90.0 + t * 0.04) - 0.5, fbm(q / 90.0 + 9.0 - t * 0.035) - 0.5);
+      vec2 n2 = vec2(vnoise(q / 7.0 + vec2(t * 0.6, 0.0)) - 0.5, vnoise(q / 5.0 + vec2(3.0, -t * 0.5)) - 0.5);
+      vec2 n = n1 * 0.5 + n2 * 0.5;
+      vec3 N = normalize(vec3(n.x * 0.3, 1.0, n.y * 0.3));
       vec3 V = normalize(cameraPosition - vP);
       vec3 R = reflect(-V, N);
-      float fres = 0.04 + 0.96 * pow(clamp(1.0 - dot(N, V), 0.0, 1.0), 5.0);
+      float fres = 0.02 + 0.98 * pow(clamp(1.0 - max(dot(N, V), 0.0), 0.0, 1.0), 5.0);
+      vec3 deep = vec3(0.002, 0.004, 0.008);
       vec3 skyc = mix(hazeColor(R), uZenith, smoothstep(0.0, 0.6, R.y));
-      vec3 col = vec3(0.004, 0.008, 0.016) + skyc * fres * 0.9;
+      vec3 col = deep + skyc * fres * 0.9;
+      if (uReflectOn > 0.0) {
+        vec4 c = uReflectMat * vec4(vP.x, uMirrorY, vP.z, 1.0);
+        vec2 uv = c.xy / c.w;
+        float dist = length(vP - cameraPosition) / uUnitsPerM;
+        float k = 1.0 / (1.0 + dist / 400.0);
+        // ripples break the image into vertical streaks (lights stretch toward the viewer)
+        vec2 dis = vec2(n.x * 0.014, n.y * 0.05) * k + vec2(0.0, -0.002);
+        vec3 refl = vec3(0.0);
+        for (int i = 0; i < 5; i++) {
+          float o = (float(i) - 2.0) * 0.007 * k;
+          refl += texture2D(uReflect, clamp(uv + dis + vec2(0.0, o), 0.001, 0.999)).rgb;
+        }
+        refl /= 5.0;
+        float w = mix(0.2, 0.85, fres);
+        col = mix(col, deep + refl * w, uReflectOn);
+      }
       float glint = pow(max(dot(R, normalize(uSunDir)), 0.0), 120.0);
-      col += vec3(1.0, 0.6, 0.35) * glint * 2.0;
-      // shimmering reflections of lights along the shore
-      float sp = step(0.992, hash12(floor(q / 6.0 + vec2(0.0, floor(uTime * 2.0))))) ;
-      col += vec3(1.0, 0.8, 0.55) * sp * 0.25 * fres;
+      col += vec3(1.0, 0.6, 0.35) * glint * 1.2;
       gl_FragColor = vec4(applyFog(col, vP), uDetail);
     }
   `,
@@ -277,6 +331,7 @@ export const buildings = {
     uniform vec3 uZenith;
     ${FOG}
     ${HASH}
+    ${NIGHT}
     varying vec3 vLocal;
     varying vec3 vN;
     varying vec3 vP;
@@ -284,56 +339,186 @@ export const buildings = {
     varying float vSeed;
     varying float vId;
     varying float vStyle;
+    // style: 0 masonry (New York), 1 glass curtain wall, 2 rooftop plant, 3 stucco / concrete (Florida)
+    vec3 masonry(float s, float florida) {
+      vec3 c = vec3(0.40, 0.36, 0.29);                               // limestone
+      if (s < 0.22) c = vec3(0.30, 0.13, 0.085);                     // red brick
+      else if (s < 0.40) c = vec3(0.19, 0.11, 0.08);                 // brown brick
+      else if (s < 0.55) c = vec3(0.27, 0.27, 0.28);                 // concrete
+      else if (s < 0.65) c = vec3(0.47, 0.44, 0.38);                 // pale stone
+      if (florida > 0.5) c = mix(vec3(0.50, 0.47, 0.41), vec3(0.36, 0.37, 0.38), step(0.55, s)); // stucco, concrete
+      return c;
+    }
+    // Far away, single windows are smaller than a pixel. Instead of averaging them to a flat
+    // grey, light whole clusters of windows (2x2, 4x4, ...) so the skyline still sparkles,
+    // blending between cluster sizes so nothing pops or shimmers.
+    float clusterLit(vec2 g, float occ, float seed) {
+      float l = max(0.0, log2(max(max(fwidth(g.x), fwidth(g.y)) * 1.6, 1e-4)));
+      float l0 = floor(l);
+      float a = hash12(floor(g / exp2(l0)) + seed + l0 * 31.7);
+      float b = hash12(floor(g / exp2(l0 + 1.0)) + seed + (l0 + 1.0) * 31.7);
+      float k = fract(l);
+      float sharp = 1.0 / (1.0 + l0 * 0.6);            // bigger clusters: softer on/off
+      float on0 = smoothstep(1.0 - occ - 0.25 * (1.0 - sharp), 1.0 - occ + 0.25 * (1.0 - sharp) + 0.02, a);
+      float on1 = smoothstep(1.0 - occ - 0.25 * (1.0 - sharp * 0.8), 1.0 - occ + 0.25 * (1.0 - sharp * 0.8) + 0.02, b);
+      return mix(on0, on1, k) * (0.8 + 0.4 * mix(a, b, k));
+    }
     void main() {
       vec3 N = normalize(vN);
       vec3 V = normalize(cameraPosition - vP);
-      vec3 L = normalize(uSunDir);
-      float hM = vScale.y / uUnitsPerM;                       // building height in metres
-      float yM = (vLocal.y + 0.5) * hM;                       // height of this fragment
+      float hM = vScale.y / uUnitsPerM;                       // height of this block in metres
+      float yM = vP.y / uUnitsPerM;                           // height above the street
+      float topM = (vP.y + (0.5 - vLocal.y) * vScale.y) / uUnitsPerM;
       float side = 1.0 - abs(N.y);
-      // facade: dark stone/glass, cooler and brighter toward the top (sky reflection)
-      vec3 body = mix(vec3(0.014, 0.017, 0.026), vec3(0.024, 0.028, 0.040), fract(vSeed * 7.3));
-      vec3 col = body * (0.5 + 0.5 * smoothstep(0.0, 1.0, vLocal.y + 0.5));
-      float fres = pow(clamp(1.0 - dot(N, V), 0.0, 1.0), 3.0);
-      col += uZenith * 0.8 * fres * side * (0.4 + 0.6 * step(0.5, vStyle));
-      col += vec3(1.0, 0.55, 0.3) * max(dot(N, L), 0.0) * 0.07 * side;   // last light from the west
-      // windows
-      float wM = vStyle > 0.5 ? 2.2 : 3.2;                    // glass towers have tighter mullions
-      float u = (abs(N.x) > 0.5 ? vLocal.z * vScale.z : vLocal.x * vScale.x) / uUnitsPerM / wM;
-      float v = yM / 3.6;
-      vec2 cell = floor(vec2(u, v));
-      vec2 f = fract(vec2(u, v));
-      float pane = smoothstep(0.08, 0.16, f.x) * smoothstep(0.92, 0.84, f.x) * smoothstep(0.12, 0.22, f.y) * smoothstep(0.88, 0.8, f.y);
-      float floorLit = step(0.35, hash12(vec2(cell.y, vSeed * 91.0)));
-      float lit = step(0.58, hash12(cell + vSeed * 37.0)) * floorLit;
-      vec3 warm = mix(vec3(1.0, 0.74, 0.50), vec3(0.72, 0.84, 1.0), step(0.62, hash12(cell.yx + vSeed * 11.0)));
-      float blur = clamp(max(fwidth(u), fwidth(v)) * 1.6 - 0.2, 0.0, 1.0);   // distance: average the grid
-      float win = mix(pane * lit, 0.06, blur);
-      float ground = smoothstep(14.0, 4.0, yM);              // shopfront band at street level
-      float bright = 0.75 + 1.1 * step(0.86, hash12(cell * 1.7 + vSeed * 5.0));
-      col += warm * (win * bright + ground * 0.25 * step(0.4, fract(vSeed * 13.1))) * side;
-      // roof and crown
+      float glassy = step(0.5, vStyle) * step(vStyle, 1.5);
+      float plant = step(1.5, vStyle) * step(vStyle, 2.5);
+      float florida = step(2.5, vStyle);
+      float s = fract(vSeed * 7.31);
+      float uM = (abs(N.x) > 0.5 ? vLocal.z * vScale.z : vLocal.x * vScale.x) / uUnitsPerM;
+
+      vec3 albedo = masonry(s, florida);
+      if (plant > 0.5) albedo = vec3(0.24, 0.24, 0.25);
+      vec3 amb = nightLight(N, yM);
+      vec3 wall = albedo * amb;
+      vec3 Np = N;
+      if (vStyle > 0.5 && vStyle < 1.5 && side > 0.5) {
+        vec2 pc = floor(vec2(((abs(N.x) > 0.5 ? vLocal.z * vScale.z : vLocal.x * vScale.x) / uUnitsPerM) / 1.5, vP.y / uUnitsPerM / 4.0));
+        vec2 j = vec2(hash12(pc + vSeed), hash12(pc.yx + vSeed * 2.0)) - 0.5;
+        Np = normalize(N + vec3(j.x, j.y * 0.6, j.x) * 0.06);
+      }
+      vec3 R = reflect(-V, Np);
+      float fres = pow(clamp(1.0 - max(dot(N, V), 0.0), 0.0, 1.0), 5.0);
+
+      // ---- windows -------------------------------------------------------
+      float bayM = glassy > 0.5 ? 1.5 : (florida > 0.5 ? 3.4 : 3.0);
+      float floorM = glassy > 0.5 ? 4.0 : 3.25;
+      vec2 g = vec2(uM / bayM, yM / floorM);
+      vec2 cell = floor(g), f = fract(g);
+      float blur = clamp(max(fwidth(g.x), fwidth(g.y)) * 1.4 - 0.25, 0.0, 1.0);
+      // lit rooms: decided per floor, then per run of windows (an apartment / an office suite)
+      float occ = glassy > 0.5 ? 0.30 : 0.40;
+      float floorOn = hash12(vec2(cell.y, vSeed * 91.0));
+      float suite = floor(cell.x / (glassy > 0.5 ? 5.0 : 2.0));
+      float roomOn = hash12(vec2(suite, cell.y) + vSeed * 37.0);
+      float bayOn = hash12(cell * 1.37 + vSeed * 3.3);
+      float lit = step(1.0 - occ, roomOn * 0.55 + floorOn * 0.3 + bayOn * 0.15);
+      if (glassy > 0.5) {
+        // offices light whole floors (cleaners, late teams); a few desks on the dark ones
+        float run = hash12(vec2(floor(cell.x / 4.0), cell.y) + vSeed * 7.0);
+        lit = step(0.62, floorOn) * step(0.2, run) + (1.0 - step(0.62, floorOn)) * step(0.93, run);
+      }
+      float tint = hash12(vec2(suite, cell.y) + vSeed * 11.0);
+      vec3 warm = mix(vec3(1.0, 0.62, 0.34), vec3(1.0, 0.78, 0.55), tint);          // 2700-3500 K
+      vec3 office = mix(vec3(0.82, 0.88, 1.0), vec3(1.0, 0.86, 0.68), step(0.7, tint)); // LED office, a few warm
+      vec3 room = (glassy > 0.5 ? office : mix(warm, vec3(0.75, 0.84, 1.0), step(0.86, tint))) * (0.22 + 0.33 * hash12(cell + vSeed * 5.0));
+      float ceiling = 0.75 + 0.5 * smoothstep(0.3, 0.95, f.y);                     // brighter near the ceiling
+      vec3 dark = vec3(0.003, 0.004, 0.006) + skyEnv(R) * (0.05 + 0.7 * fres);         // unlit glass reflects the sky
+
+      vec3 col;
+      if (glassy > 0.5) {
+        vec3 tintG = mix(vec3(0.55, 0.75, 0.85), vec3(0.62, 0.62, 0.66), step(0.5, s));
+        float spandrel = step(f.y, 0.22);
+        float mull = max(smoothstep(0.06, 0.0, f.x), smoothstep(0.94, 1.0, f.x));
+        vec3 refl = skyEnv(R) * (0.05 + 0.5 * fres) * tintG;
+        float grid2 = 0.55 + 0.45 * step(0.5, fract(uM / 3.0)) * step(0.35, f.y);   // ceiling light rows
+        vec3 inside = lit * room * ceiling * grid2 * 0.3 + vec3(0.012, 0.014, 0.018) * (1.0 - lit);
+        vec3 vision = inside + refl;
+        vec3 spand = vec3(0.012, 0.014, 0.02) + refl * 0.8;
+        col = mix(vision, spand, spandrel);
+        col = mix(col, vec3(0.03, 0.033, 0.04) * (1.0 + amb * 4.0), mull * 0.8);
+        // far away: average of a floor (glass, spandrel and the share of lit suites)
+        vec3 roomMean = vec3(0.30, 0.31, 0.33);
+        float cl = clusterLit(vec2(g.x / 48.0, g.y), occ * 1.2, vSeed * 53.0);
+        vec3 avg = refl * 0.85 + roomMean * cl * 0.26 + vec3(0.008, 0.009, 0.012);
+        col = mix(col, avg, blur);
+      } else {
+        float pane = smoothstep(0.18, 0.24, f.x) * smoothstep(0.82, 0.76, f.x) * smoothstep(0.24, 0.3, f.y) * smoothstep(0.9, 0.84, f.y);
+        float blind = step(0.55, hash12(cell * 3.1 + vSeed)) * smoothstep(0.6, 0.62, f.y) * 0.65;   // drawn blinds
+        vec3 win = mix(dark, room * ceiling * (1.0 - blind), lit);
+        col = mix(wall, win, pane);
+        // ledges / cornice lines catch a little light
+        col += albedo * amb * 0.6 * smoothstep(0.06, 0.0, f.y) * side;
+        vec3 roomMean = vec3(0.40, 0.27, 0.16);
+        float cl = clusterLit(g, occ, vSeed * 53.0);
+        vec3 avg = mix(wall, roomMean * cl * 0.75 + vec3(0.006, 0.007, 0.012), 0.36);
+        col = mix(col, avg, blur);
+      }
+      if (plant > 0.5) {
+        float louver = step(0.5, fract(yM / 0.6)) * 0.5 + 0.5;
+        col = wall * louver;
+      }
+
+      // street level: shopfronts and lobbies
+      float shop = step(yM, 4.6) * side * (1.0 - plant) * (1.0 - florida * 0.6);
+      float open = step(0.3, hash12(vec2(floor(uM / 7.0), vSeed * 13.0)));
+      vec3 shopCol = mix(vec3(1.0, 0.72, 0.45), vec3(0.9, 0.95, 1.0), glassy) * (0.35 + 0.35 * hash12(vec2(floor(uM / 7.0), 3.0 + vSeed)));
+      float shopPane = smoothstep(0.6, 1.0, yM) * smoothstep(4.2, 3.9, yM) * step(0.08, fract(uM / 7.0));
+      col = mix(col, shopCol * open * 1.1 + dark * 0.4, shop * shopPane);
+
+      // roof: dark membrane / gravel, a parapet edge
       float roof = step(0.5, N.y);
-      col = mix(col, vec3(0.014, 0.015, 0.02) + vec3(0.6, 0.7, 1.0) * 0.02, roof);
-      float crown = smoothstep(0.985, 1.0, vLocal.y + 0.5) * side * step(120.0, hM);
-      col += vec3(0.85, 0.9, 1.0) * crown * 1.2;
-      // aviation lights on tall buildings
-      float tall = step(150.0, hM);
-      float corner = step(0.42, abs(vLocal.x)) * step(0.42, abs(vLocal.z)) * step(0.47, vLocal.y);
-      col += vec3(1.0, 0.08, 0.04) * corner * tall * 6.0 * step(0.5, fract(uTime * 0.5 + vSeed));
+      vec3 roofCol = vec3(0.020, 0.021, 0.025) * (0.8 + 0.4 * hash12(floor(vP.xz / uUnitsPerM / 3.0))) + uZenith * 0.6;
+      vec2 e = 0.5 - abs(vLocal.xz);
+      float parapet = smoothstep(0.8 / max(vScale.x / uUnitsPerM, 1.0), 0.0, min(e.x, e.y));
+      roofCol += albedo * amb * 0.8 * parapet;
+      col = mix(col, roofCol, roof);
+
+      // floodlit crowns on some towers
+      float crownOn = step(200.0, topM) * step(0.8, fract(vSeed * 3.7)) * (1.0 - plant);
+      float band = smoothstep(topM - 18.0, topM - 2.0, yM) * side;
+      vec3 crownCol = mix(vec3(1.0, 0.82, 0.55), vec3(0.75, 0.85, 1.0), step(0.85, fract(vSeed * 3.7)));
+      col += crownCol * band * crownOn * 0.3 * (0.6 + 0.4 * fres);
+      // aviation lights
+      float corner = step(0.44, abs(vLocal.x)) * step(0.44, abs(vLocal.z)) * step(0.48, vLocal.y);
+      col += vec3(1.0, 0.06, 0.03) * corner * step(150.0, topM) * 5.0 * step(0.5, fract(uTime * 0.5 + vSeed));
+
       // highlight (property-type hover)
       float hot = (1.0 - step(0.5, abs(vId - uHot))) * uHotOn;
       if (vId > -0.5) {
-        col += vec3(1.0, 0.82, 0.55) * (0.12 + fres * 1.6) * hot;
-        col += vec3(1.0, 0.82, 0.55) * win * 1.5 * hot;
+        col += vec3(1.0, 0.82, 0.55) * (0.10 + fres * 1.2) * hot;
+        col *= 1.0 + hot * 0.8;
       }
       gl_FragColor = vec4(applyFog(col, vP), 1.0);
     }
   `,
 };
 
+// Rooftop water tanks (wood barrel, conical cap, steel stand).
+export const tanks = {
+  vertexShader: /* glsl */ `
+    attribute float aPart;
+    varying vec3 vN;
+    varying vec3 vP;
+    varying float vPart;
+    void main() {
+      vPart = aPart;
+      vec4 wp = modelMatrix * instanceMatrix * vec4(position, 1.0);
+      vP = wp.xyz;
+      vN = normalize(mat3(modelMatrix) * mat3(instanceMatrix) * normal);
+      gl_Position = projectionMatrix * viewMatrix * wp;
+    }
+  `,
+  fragmentShader: /* glsl */ `
+    uniform float uUnitsPerM;
+    uniform vec3 uZenith;
+    ${FOG}
+    ${HASH}
+    ${NIGHT}
+    varying vec3 vN;
+    varying vec3 vP;
+    varying float vPart;
+    void main() {
+      vec3 N = normalize(vN);
+      vec3 albedo = vPart < 0.5 ? vec3(0.20, 0.13, 0.08) : (vPart < 1.5 ? vec3(0.08, 0.08, 0.085) : vec3(0.05, 0.05, 0.055));
+      if (vPart < 0.5) albedo *= 0.8 + 0.3 * step(0.5, fract(vP.y / uUnitsPerM / 0.9));   // hoops
+      vec3 col = albedo * nightLight(N, vP.y / uUnitsPerM);
+      gl_FragColor = vec4(applyFog(col, vP), 1.0);
+    }
+  `,
+};
+
 // ---------------------------------------------------------------------------
-// Homes: instanced houses (body + gable roof in one geometry, roof marked by uv.y > 1).
+// Homes: instanced walls (box) and hip roofs (separate instanced mesh, uv.y = 2).
 // ---------------------------------------------------------------------------
 export const houses = {
   vertexShader: /* glsl */ `
@@ -341,12 +526,14 @@ export const houses = {
     varying vec3 vLocal;
     varying vec3 vN;
     varying vec3 vP;
+    varying vec3 vScale;
     varying float vSeed;
     varying float vRoof;
     void main() {
       vLocal = position;
       vSeed = aSeed;
       vRoof = uv.y;
+      vScale = vec3(length(instanceMatrix[0].xyz), length(instanceMatrix[1].xyz), length(instanceMatrix[2].xyz));
       vec4 wp = modelMatrix * instanceMatrix * vec4(position, 1.0);
       vP = wp.xyz;
       vN = normalize(mat3(modelMatrix) * mat3(instanceMatrix) * normal);
@@ -356,44 +543,117 @@ export const houses = {
   fragmentShader: /* glsl */ `
     uniform float uTime;
     uniform vec3 uZenith;
+    uniform float uUnitsPerM;
     ${FOG}
     ${HASH}
+    ${NIGHT}
     varying vec3 vLocal;
     varying vec3 vN;
     varying vec3 vP;
+    varying vec3 vScale;
     varying float vSeed;
     varying float vRoof;
     void main() {
       vec3 N = normalize(vN);
-      vec3 L = normalize(uSunDir);
-      vec3 wall = mix(vec3(0.05, 0.048, 0.044), vec3(0.036, 0.04, 0.05), fract(vSeed * 5.1));
-      vec3 roof = mix(vec3(0.028, 0.024, 0.024), vec3(0.03, 0.034, 0.042), fract(vSeed * 3.3));
-      vec3 col = vRoof > 1.5 ? roof : wall;
-      col *= 0.6 + 0.4 * max(N.y, 0.0);
-      col += uZenith * 0.5 * max(N.y, 0.0);
-      col += vec3(1.0, 0.55, 0.3) * max(dot(N, L), 0.0) * 0.08;
-      if (vRoof < 1.5) {
-        // two or three warm windows per side, some rooms dark
-        float u = (abs(N.x) > 0.5 ? vLocal.z : vLocal.x) * 3.0 + 1.5;
-        float w = smoothstep(0.15, 0.25, fract(u)) * smoothstep(0.85, 0.75, fract(u)) * smoothstep(0.25, 0.35, vLocal.y + 0.5) * smoothstep(0.75, 0.65, vLocal.y + 0.5);
-        float lit = step(0.4, hash12(vec2(floor(u), vSeed * 77.0 + N.x * 3.0 + N.z * 5.0)));
-        col += vec3(1.0, 0.68, 0.38) * w * lit * 1.6;
+      float yM = vP.y / uUnitsPerM;
+      vec3 amb = nightLight(N, yM);
+      float s = fract(vSeed * 5.13);
+      vec3 col;
+      if (vRoof > 1.5) {
+        // roofs: grey or brown shingle, a third terracotta barrel tile
+        float r = fract(vSeed * 3.71);
+        vec3 alb = r < 0.33 ? vec3(0.30, 0.12, 0.065) : (r < 0.8 ? vec3(0.13, 0.13, 0.135) : vec3(0.16, 0.11, 0.075));
+        float courses = 0.85 + 0.15 * step(0.5, fract(vP.y / uUnitsPerM / 0.35));
+        col = alb * amb * courses * 1.2;
+      } else {
+        vec3 alb = vec3(0.56, 0.51, 0.41);                                   // cream stucco
+        if (s < 0.18) alb = vec3(0.48, 0.42, 0.33);                          // beige
+        else if (s < 0.34) alb = vec3(0.43, 0.44, 0.45);                     // grey
+        else if (s < 0.46) alb = vec3(0.56, 0.50, 0.32);                     // pale yellow
+        else if (s < 0.56) alb = vec3(0.40, 0.45, 0.50);                     // blue-grey
+        else if (s < 0.72) alb = vec3(0.62, 0.60, 0.56);                     // white
+        col = alb * amb;
+        // windows: two or three per side, most rooms lit in the evening
+        float side = abs(N.x) > 0.5 ? vLocal.z * vScale.z : vLocal.x * vScale.x;
+        float sideW = abs(N.x) > 0.5 ? vScale.z : vScale.x;
+        float n = max(2.0, floor(sideW / uUnitsPerM / 4.0));
+        float u = (side / sideW + 0.5) * n;
+        float storey = vScale.y / uUnitsPerM > 4.5 ? 2.0 : 1.0;
+        float v = (vLocal.y) * storey;
+        vec2 cell = vec2(floor(u), floor(v));
+        vec2 f = vec2(fract(u), fract(v));
+        float win = smoothstep(0.22, 0.28, f.x) * smoothstep(0.78, 0.72, f.x) * smoothstep(0.3, 0.36, f.y) * smoothstep(0.82, 0.76, f.y);
+        float lit = step(0.42, hash12(cell + vSeed * 77.0 + N.x * 3.0 + N.z * 5.0));
+        vec3 room = mix(vec3(1.0, 0.64, 0.36), vec3(1.0, 0.8, 0.58), hash12(cell * 2.3 + vSeed)) * (0.28 + 0.3 * hash12(cell + vSeed * 3.0));
+        vec3 glass = vec3(0.004, 0.005, 0.009);
+        col = mix(col, mix(glass, room, lit), win);
+        // porch / coach lights on the front, with a warm wash on the wall around them
+        float front = step(0.5, N.z) * step(0.35, fract(vSeed * 9.7));
+        vec2 pl = vec2((vLocal.x - 0.22) * vScale.x, (vLocal.y - 0.62 / storey) * vScale.y) / uUnitsPerM;
+        float d2 = dot(pl, pl);
+        col += front * (vec3(1.0, 0.7, 0.4) * exp(-d2 * 0.9) * 0.35 + alb * vec3(1.0, 0.7, 0.4) * exp(-d2 * 0.12) * 0.25);
+        col += front * vec3(1.0, 0.8, 0.5) * 2.0 * step(d2, 0.04);
       }
       gl_FragColor = vec4(applyFog(col, vP), 1.0);
     }
   `,
 };
 
-// Trees: instanced low-poly crowns.
+// Trees: live oaks (lumpy, broad canopies) as displaced icospheres.
 export const trees = {
   vertexShader: /* glsl */ `
     attribute float aSeed;
     varying vec3 vN;
     varying vec3 vP;
     varying float vSeed;
+    varying float vH;
+    ${HASH}
     void main() {
       vSeed = aSeed;
-      vec4 wp = modelMatrix * instanceMatrix * vec4(position, 1.0);
+      vec3 p = position;
+      float bump = vnoise(p.xz * 2.3 + aSeed * 40.0) * 0.35 + vnoise(p.xy * 4.1 + aSeed * 13.0) * 0.18;
+      p *= 0.85 + bump;
+      vH = position.y;
+      vec4 wp = modelMatrix * instanceMatrix * vec4(p, 1.0);
+      vP = wp.xyz;
+      vN = normalize(mat3(modelMatrix) * mat3(instanceMatrix) * normalize(position + vec3(0.0, 0.3, 0.0)));
+      gl_Position = projectionMatrix * viewMatrix * wp;
+    }
+  `,
+  fragmentShader: /* glsl */ `
+    uniform vec3 uZenith;
+    ${FOG}
+    ${HASH}
+    ${NIGHT}
+    varying vec3 vN;
+    varying vec3 vP;
+    varying float vSeed;
+    varying float vH;
+    void main() {
+      vec3 N = normalize(vN);
+      vec3 alb = mix(vec3(0.10, 0.17, 0.08), vec3(0.15, 0.20, 0.09), fract(vSeed * 9.1));
+      float leaf = 0.7 + 0.5 * hash12(floor(vP.xz * 400.0 + vP.y * 300.0));
+      vec3 col = alb * nightLight(N, 2.0 + vH * 4.0) * leaf * (0.55 + 0.45 * smoothstep(-0.6, 0.6, vH));
+      gl_FragColor = vec4(applyFog(col, vP), 1.0);
+    }
+  `,
+};
+
+// Palms: trunk and drooping fronds (aPart 0 trunk, 1 frond).
+export const palms = {
+  vertexShader: /* glsl */ `
+    attribute float aPart;
+    attribute float aSeed;
+    varying vec3 vN;
+    varying vec3 vP;
+    varying float vPart;
+    varying float vSeed;
+    uniform float uTime;
+    void main() {
+      vPart = aPart; vSeed = aSeed;
+      vec3 p = position;
+      p.xz += aPart * sin(uTime * 0.8 + aSeed * 20.0 + position.x * 4.0) * 0.01 * max(position.y - 0.85, 0.0) * 10.0;
+      vec4 wp = modelMatrix * instanceMatrix * vec4(p, 1.0);
       vP = wp.xyz;
       vN = normalize(mat3(modelMatrix) * mat3(instanceMatrix) * normal);
       gl_Position = projectionMatrix * viewMatrix * wp;
@@ -402,14 +662,17 @@ export const trees = {
   fragmentShader: /* glsl */ `
     uniform vec3 uZenith;
     ${FOG}
+    ${HASH}
+    ${NIGHT}
     varying vec3 vN;
     varying vec3 vP;
+    varying float vPart;
     varying float vSeed;
     void main() {
       vec3 N = normalize(vN);
-      vec3 col = mix(vec3(0.010, 0.022, 0.014), vec3(0.016, 0.028, 0.02), fract(vSeed * 9.1));
-      col += uZenith * 0.35 * max(N.y, 0.0);
-      col += vec3(1.0, 0.55, 0.3) * max(dot(N, normalize(uSunDir)), 0.0) * 0.05;
+      if (!gl_FrontFacing) N = -N;
+      vec3 alb = vPart > 0.5 ? vec3(0.12, 0.19, 0.08) : vec3(0.28, 0.24, 0.18);
+      vec3 col = alb * nightLight(N, 6.0) * (vPart > 0.5 ? 1.2 : 1.0);
       gl_FragColor = vec4(applyFog(col, vP), 1.0);
     }
   `,
@@ -439,7 +702,7 @@ export const pools = {
       vec2 c = abs(vUv - 0.5) * 2.0;
       float edge = smoothstep(0.75, 1.0, max(c.x, c.y));
       float ripple = 0.85 + 0.15 * sin(uTime * 2.0 + (vUv.x + vUv.y) * 12.0 + vSeed * 30.0);
-      vec3 col = mix(vec3(0.15, 0.85, 1.0) * 1.1 * ripple, vec3(0.55, 0.8, 0.85) * 0.3, edge);
+      vec3 col = mix(vec3(0.12, 0.7, 0.9) * 0.75 * ripple, vec3(0.5, 0.48, 0.44) * 0.06, edge);
       gl_FragColor = vec4(applyFog(col, vP), 1.0);
     }
   `,
@@ -540,9 +803,9 @@ export const street = {
     void main() {
       float across = 1.0 - abs(vUv.y - 0.5) * 2.0;
       float lampF = abs(fract(vUv.x) - 0.5);
-      float lamp = smoothstep(0.12, 0.0, lampF) * smoothstep(0.3, 1.0, across);
+      float lamp = smoothstep(0.16, 0.0, lampF) * smoothstep(0.0, 0.8, across);
       float blur = clamp(fwidth(vUv.x) * 1.5 - 0.3, 0.0, 1.0);
-      float g = across * 0.12 + mix(lamp, 0.2 * across, blur);
+      float g = across * 0.04 + mix(lamp * 0.6, 0.11 * across, blur);
       vec3 d = vP - cameraPosition;
       float fade = exp(-pow(length(d) * uFogDensity, 1.5));
       gl_FragColor = vec4(uColor * g * fade * uDetail, 1.0);

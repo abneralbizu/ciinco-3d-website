@@ -13,7 +13,7 @@ export const KEYFRAMES = [
   { name: 'Commercial', pos: [40.7460, -74.0150, 230], look: [40.7585, -73.9850, 190], ox: 0.27, oy: 0, my: 0.12, fov: 40, mob: 1.3 },
   { name: 'Residential', pos: [28.6500, -81.2690, 115], look: [28.6560, -81.2600, 0], ox: -0.27, oy: 0, my: 0.14, fov: 40, mob: 1.25 },
   { name: 'Advisory', pos: [28.5408, -81.3712, 95], look: [28.5446, -81.3770, 105], ox: 0.28, oy: 0, my: 0.12, fov: 40, mob: 1.35 },
-  { name: 'Track record', pos: [28.5428, -81.3625, 55], look: [28.5420, -81.3800, 70], ox: 0, oy: -0.08, my: 0.08, fov: 42, mob: 1.2 },
+  { name: 'Track record', pos: [28.5424, -81.3678, 34], look: [28.5432, -81.3790, 75], ox: 0, oy: -0.08, my: 0.08, fov: 42, mob: 1.2 },
   { name: 'Listings', pos: [28.5455, -81.3560, 650], look: [28.5560, -81.3560, 0], ox: -0.26, oy: 0, my: 0.12, fov: 40, mob: 1.25 },
   { name: 'Contact', pos: [28.6200, -81.3050, 1500], look: [28.6700, -81.2450, 0], ox: -0.12, oy: 0.05, my: 0.12, fov: 40, mob: 1.2 },
 ];

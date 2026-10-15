@@ -419,6 +419,7 @@ main { position: relative; z-index: 2; overflow-x: clip; }
   .telemetry { display: none; }
   .stepper { top: auto; bottom: calc(16px + env(safe-area-inset-bottom)); right: 16px; grid-auto-flow: column; }
   .step-btn { height: 44px; min-width: 44px; }
+  body.next-visible .stepper { opacity: 0; pointer-events: none; }
 }
 @media (max-width: 860px) {
   :root { --header-h: 64px; }

@@ -2,7 +2,7 @@
 import {
   ACESFilmicToneMapping, Clock, HalfFloatType, LinearMipmapLinearFilter, LoadingManager, Matrix4,
   NoColorSpace, PerspectiveCamera, Ray, Scene, SRGBColorSpace, TextureLoader, Vector2, Vector3,
-  WebGLRenderer, WebGLRenderTarget, Plane,
+  WebGLRenderer, WebGLRenderTarget, Plane, Vector4,
 } from 'three';
 import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
 import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
@@ -108,6 +108,53 @@ async function boot() {
   composer.addPass(final);
   world.uPixelRatio.value = dpr;
 
+  // ---- Water reflections ---------------------------------------------------------
+  // A second camera mirrored in the water plane renders the scene at reduced size; the water
+  // samples it with ripple distortion (the same idea as three.js' Reflector, shared by all water).
+  const refl = {
+    on: !params.has('noreflect'),
+    scale: quality.low ? 0.35 : 0.5,
+    rt: new WebGLRenderTarget(1, 1, { type: HalfFloatType }),
+    cam: new PerspectiveCamera(),
+    plane: new Plane(), clip: new Vector4(), q: new Vector4(), up: new Vector3(), fwd: new Vector3(),
+  };
+  world.reflect.uReflect.value = refl.rt.texture;
+  const sizeReflection = () => {
+    const w = Math.max(2, Math.round(window.innerWidth * dpr * refl.scale)), h = Math.max(2, Math.round(window.innerHeight * dpr * refl.scale));
+    refl.rt.setSize(w, h);
+  };
+  sizeReflection();
+  function renderReflection(vx, vy) {
+    const c = refl.cam;
+    const mY = world.reflect.uMirrorY.value;
+    c.fov = camera.fov; c.aspect = camera.aspect; c.near = camera.near; c.far = camera.far;
+    c.position.set(camera.position.x, 2 * mY - camera.position.y, camera.position.z);
+    refl.fwd.set(0, 0, -1).applyQuaternion(camera.quaternion); refl.fwd.y *= -1;
+    refl.up.set(0, 1, 0).applyQuaternion(camera.quaternion); refl.up.y *= -1;
+    c.up.copy(refl.up);
+    c.lookAt(tmp.copy(c.position).add(refl.fwd));
+    // mirrored view: the off-centre framing flips horizontally
+    c.setViewOffset(W(), H(), -vx, vy, W(), H());
+    c.updateProjectionMatrix();
+    c.updateMatrixWorld();
+    const m = world.reflect.uReflectMat.value;
+    m.set(0.5, 0, 0, 0.5, 0, 0.5, 0, 0.5, 0, 0, 0.5, 0.5, 0, 0, 0, 1);
+    m.multiply(c.projectionMatrix).multiply(c.matrixWorldInverse);
+    // oblique near plane: nothing below the water is drawn in the reflection
+    refl.plane.setFromNormalAndCoplanarPoint(tmp2.set(0, 1, 0), tmp.set(0, mY, 0)).applyMatrix4(c.matrixWorldInverse);
+    refl.clip.set(refl.plane.normal.x, refl.plane.normal.y, refl.plane.normal.z, refl.plane.constant);
+    const e = c.projectionMatrix.elements;
+    refl.q.set((Math.sign(refl.clip.x) + e[8]) / e[0], (Math.sign(refl.clip.y) + e[9]) / e[5], -1, (1 + e[10]) / e[14]);
+    refl.clip.multiplyScalar(2 / refl.clip.dot(refl.q));
+    e[2] = refl.clip.x; e[6] = refl.clip.y; e[10] = refl.clip.z + 1; e[14] = refl.clip.w;
+    world.waterMeshes.forEach((w) => { w.visible = false; });
+    renderer.setRenderTarget(refl.rt);
+    renderer.clear();
+    renderer.render(scene, c);
+    renderer.setRenderTarget(null);
+    world.waterMeshes.forEach((w) => { w.visible = true; });
+  }
+
   // ---- Labels ----------------------------------------------------------------
   const labelRoot = document.getElementById('labels');
   const mkLabel = (cls, htmlStr) => {
@@ -163,6 +210,7 @@ async function boot() {
     composer.setPixelRatio(dpr);
     composer.setSize(w, h);
     world.uPixelRatio.value = dpr;
+    sizeReflection();
     computeAnchors();
   }
   window.addEventListener('resize', resize);
@@ -355,6 +403,10 @@ async function boot() {
       if (worldHit && cursorLabel.textContent !== worldHit.label) cursorLabel.textContent = worldHit.label;
     }
 
+    // reflections only matter near the ground
+    const reflOn = refl.on && alt < 60 && world.fog.detail.value > 0.05;
+    world.reflect.uReflectOn.value = reflOn ? 1 : 0;
+    if (reflOn) renderReflection(-frame.ox * W(), frame.oy * H());
     composer.render(dt);
 
     if (time - lastUI > 0.1) {
@@ -363,12 +415,13 @@ async function boot() {
       bus.setProgress(p, Math.round(p), `${fmtLat(ll.lat)} · ${fmtLon(ll.lon)} · ALT ${fmtAlt(altitudeM(alt, ll.lat))}`);
     }
 
-    if (started && perf.checked < 3) {
+    if (started && perf.checked < 4) {
       perf.frames++; perf.acc += dt;
       if (perf.frames >= 90) {
         const avg = perf.acc / perf.frames;
         perf.frames = 0; perf.acc = 0; perf.checked++;
-        if (avg > 1 / 42 && dpr > 0.8) { dpr = Math.max(0.75, dpr - 0.35); resize(); } else if (avg > 1 / 28 && bloom.enabled) bloom.enabled = false;
+        // too slow: first cheaper reflections, then none, then fewer pixels, then no glow
+        if (avg > 1 / 42 && refl.on && refl.scale > 0.3) { refl.scale = 0.25; sizeReflection(); } else if (avg > 1 / 42 && refl.on) { refl.on = false; } else if (avg > 1 / 42 && dpr > 0.8) { dpr = Math.max(0.75, dpr - 0.35); resize(); } else if (avg > 1 / 28 && bloom.enabled) bloom.enabled = false;
       }
     }
   }
