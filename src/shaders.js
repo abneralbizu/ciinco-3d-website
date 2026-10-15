@@ -229,7 +229,7 @@ export const water = {
       vec3 N = normalize(vec3(n2.x * 0.35, 1.0, n2.y * 0.35));
       vec3 V = normalize(cameraPosition - vP);
       vec3 R = reflect(-V, N);
-      float fres = 0.04 + 0.96 * pow(1.0 - max(dot(N, V), 0.0), 5.0);
+      float fres = 0.04 + 0.96 * pow(clamp(1.0 - dot(N, V), 0.0, 1.0), 5.0);
       vec3 skyc = mix(hazeColor(R), uZenith, smoothstep(0.0, 0.6, R.y));
       vec3 col = vec3(0.004, 0.008, 0.016) + skyc * fres * 0.9;
       float glint = pow(max(dot(R, normalize(uSunDir)), 0.0), 120.0);
@@ -293,7 +293,7 @@ export const buildings = {
       // facade: dark stone/glass, cooler and brighter toward the top (sky reflection)
       vec3 body = mix(vec3(0.014, 0.017, 0.026), vec3(0.024, 0.028, 0.040), fract(vSeed * 7.3));
       vec3 col = body * (0.5 + 0.5 * smoothstep(0.0, 1.0, vLocal.y + 0.5));
-      float fres = pow(1.0 - max(dot(N, V), 0.0), 3.0);
+      float fres = pow(clamp(1.0 - dot(N, V), 0.0, 1.0), 3.0);
       col += uZenith * 0.8 * fres * side * (0.4 + 0.6 * step(0.5, vStyle));
       col += vec3(1.0, 0.55, 0.3) * max(dot(N, L), 0.0) * 0.07 * side;   // last light from the west
       // windows
@@ -507,7 +507,7 @@ export const ribbon = {
     varying vec3 vP;
     void main() {
       float across = 1.0 - abs(vUv.y - 0.5) * 2.0;
-      float core = pow(across, 3.0);
+      float core = pow(clamp(across, 0.0, 1.0), 3.0);
       float a = core;
       if (uDash > 0.0) {
         float d = fract(vUv.x * uDash - uTime * 0.35);
@@ -573,7 +573,7 @@ export const beam = {
     void main() {
       vec3 V = normalize(cameraPosition - vP);
       float edge = pow(abs(dot(normalize(vN), V)), 2.0);
-      float fade = pow(1.0 - vUv.y, 2.2);
+      float fade = pow(clamp(1.0 - vUv.y, 0.0, 1.0), 2.2);
       float pulse = 0.8 + 0.2 * sin(uTime * 2.0 - vUv.y * 20.0);
       gl_FragColor = vec4(uColor * edge * fade * pulse * uIntensity, 1.0);
     }
@@ -635,7 +635,7 @@ export const floors = {
     void main() {
       vec3 N = normalize(vN);
       vec3 V = normalize(cameraPosition - vP);
-      float fres = pow(1.0 - max(dot(N, V), 0.0), 2.0);
+      float fres = pow(clamp(1.0 - dot(N, V), 0.0, 1.0), 2.0);
       float shown = smoothstep(vFloor / uCount - 0.02, vFloor / uCount + 0.06, uDraw);
       float hot = 1.0 - step(0.5, abs(vFloor - uHot));
       // glowing slab edges
@@ -729,6 +729,25 @@ export const glowSprite = {
       float a = exp(-r * r * 9.0) + 0.25 * exp(-r * 3.0);
       a *= 1.0 - smoothstep(0.85, 1.0, r);
       gl_FragColor = vec4(uColor * a * uIntensity, 1.0);
+    }
+  `,
+};
+
+// Guard before the glow pass: an invalid pixel (NaN / infinity) from any surface would
+// otherwise be blurred by the bloom into a large black rectangle (seen on Safari / Metal).
+export const sanitizePass = {
+  uniforms: { tDiffuse: { value: null } },
+  vertexShader: /* glsl */ `
+    varying vec2 vUv;
+    void main() { vUv = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }
+  `,
+  fragmentShader: /* glsl */ `
+    uniform sampler2D tDiffuse;
+    varying vec2 vUv;
+    float ok(float v) { return (v >= 0.0 && v < 2000.0) ? v : 0.0; }
+    void main() {
+      vec4 c = texture2D(tDiffuse, vUv);
+      gl_FragColor = vec4(ok(c.r), ok(c.g), ok(c.b), 1.0);
     }
   `,
 };

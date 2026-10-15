@@ -13,7 +13,7 @@ import { buildWorld } from './world.js';
 import { sampleJourney, CHAPTERS } from './journey.js';
 import { unproject, altitudeM, P } from './geo.js';
 import { initUI, setLoader, finishLoading, reducedMotion } from './ui.js';
-import { finalPass } from './shaders.js';
+import { finalPass, sanitizePass } from './shaders.js';
 
 const html = document.documentElement;
 html.classList.add('js');
@@ -100,6 +100,7 @@ async function boot() {
   composer.setPixelRatio(dpr);
   composer.setSize(window.innerWidth, window.innerHeight);
   composer.addPass(new RenderPass(scene, camera));
+  composer.addPass(new ShaderPass(sanitizePass));
   const bloom = new UnrealBloomPass(new Vector2(window.innerWidth, window.innerHeight), 0.42, 0.35, 1.05);
   composer.addPass(bloom);
   composer.addPass(new OutputPass());
