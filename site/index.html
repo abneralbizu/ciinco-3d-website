@@ -17,7 +17,7 @@
   <meta name="twitter:card" content="summary_large_image">
   <link rel="preload" href="assets/fonts/archivo-variable.woff2" as="font" type="font/woff2" crossorigin>
   <link rel="preload" href="assets/fonts/instrument-serif-italic.woff2" as="font" type="font/woff2" crossorigin>
-  <link rel="stylesheet" href="assets/css/cosmos.css?v=202610151454">
+  <link rel="stylesheet" href="assets/css/cosmos.css?v=202610151458">
   <script type="application/ld+json">
   {
     "@context": "https://schema.org",
@@ -81,8 +81,8 @@
   <!-- ===== SYSTEM MAP (chapter progress) ===== -->
   <nav class="system-map" aria-label="Chapters">
     <ol>
-      <li><a href="#main" data-chapter="0"><span class="sm-num mono">01</span><span class="sm-name">Skyline</span></a></li>
-      <li><a href="#home-port" data-chapter="1"><span class="sm-num mono">02</span><span class="sm-name">Our cities</span></a></li>
+      <li><a href="#main" data-chapter="0"><span class="sm-num mono">01</span><span class="sm-name">Our cities</span></a></li>
+      <li><a href="#launch" data-chapter="1"><span class="sm-num mono">02</span><span class="sm-name">Skyline</span></a></li>
       <li><a href="#commercial" data-chapter="2"><span class="sm-num mono">03</span><span class="sm-name">Commercial</span></a></li>
       <li><a href="#residential" data-chapter="3"><span class="sm-num mono">04</span><span class="sm-name">Residential</span></a></li>
       <li><a href="#advisory" data-chapter="4"><span class="sm-num mono">05</span><span class="sm-name">Advisory</span></a></li>
@@ -94,36 +94,19 @@
   </nav>
 
   <div class="telemetry mono" aria-hidden="true">
-    <span id="tm-sector">01 · Skyline</span>
-    <span id="tm-coords">40.6965° N · 74.0215° W</span>
+    <span id="tm-sector">01 · Our cities</span>
+    <span id="tm-coords">25.6000° N · 80.6000° W</span>
   </div>
 
   <div class="cursor" id="cursor" aria-hidden="true"><span class="cursor-ring"></span><span class="cursor-label mono" id="cursor-label"></span></div>
 
   <main id="main" tabindex="-1">
 
-    <!-- ===== 00 HERO ===== -->
-    <section class="chapter hero" id="launch" data-chapter="0" aria-labelledby="hero-title">
-      <div class="wrap">
-        <p class="eyebrow mono reveal"><span class="eyebrow-name">Continental Investments International Network Co.</span> <span class="sep" aria-hidden="true">/</span> <span>Est. 1990</span></p>
-        <h1 id="hero-title" class="display reveal-lines">
-          <span class="line"><span>From street level</span></span>
-          <span class="line"><span>to <em>skyline.</em></span></span>
-        </h1>
-        <p class="lede reveal">Commercial and residential real estate in Florida and New York, guided by a boutique team that has been reading the market since 1990.</p>
-        <div class="cta-row reveal">
-          <a class="btn btn-primary" href="#home-port">Begin the journey <span class="btn-arrow" aria-hidden="true">↓</span></a>
-          <a class="btn btn-ghost" href="#contact">Talk to an agent</a>
-        </div>
-      </div>
-      <a class="scroll-cue mono" href="#home-port" aria-hidden="true" tabindex="-1"><span class="scroll-cue-line"></span>Scroll to explore</a>
-    </section>
-
-    <!-- ===== 01 HOME PORT ===== -->
-    <section class="chapter chapter-left" id="home-port" data-chapter="1" aria-labelledby="home-title">
+    <!-- ===== 01 OUR CITIES ===== -->
+    <section class="chapter chapter-left" id="home-port" data-chapter="0" aria-labelledby="home-title">
       <div class="wrap">
         <div class="panel">
-          <p class="kicker mono reveal"><span class="kicker-num">02</span> Our cities</p>
+          <p class="kicker mono reveal"><span class="kicker-num">01</span> Our cities</p>
           <h2 id="home-title" class="display-2 reveal-lines"><span class="line"><span>Two cities.</span></span><span class="line"><span><em>One network.</em></span></span></h2>
           <p class="body reveal">Founded in 1990, Continental Investments International Network Co. offers customized real estate and development services with a client-first approach. We are a full-service boutique with a small-firm feel, committed to the expertise, support and service integration you need to succeed.</p>
           <ul class="offices reveal-stagger">
@@ -144,6 +127,23 @@
           </ul>
         </div>
       </div>
+    </section>
+
+    <!-- ===== 02 SKYLINE ===== -->
+    <section class="chapter hero" id="launch" data-chapter="1" aria-labelledby="hero-title">
+      <div class="wrap">
+        <p class="eyebrow mono reveal"><span class="eyebrow-name">Continental Investments International Network Co.</span> <span class="sep" aria-hidden="true">/</span> <span>Est. 1990</span></p>
+        <h1 id="hero-title" class="display reveal-lines">
+          <span class="line"><span>From street level</span></span>
+          <span class="line"><span>to <em>skyline.</em></span></span>
+        </h1>
+        <p class="lede reveal">Commercial and residential real estate in Florida and New York, guided by a boutique team that has been reading the market since 1990.</p>
+        <div class="cta-row reveal">
+          <a class="btn btn-primary" href="#commercial">Begin the journey <span class="btn-arrow" aria-hidden="true">↓</span></a>
+          <a class="btn btn-ghost" href="#contact">Talk to an agent</a>
+        </div>
+      </div>
+      <a class="scroll-cue mono" href="#commercial" aria-hidden="true" tabindex="-1"><span class="scroll-cue-line"></span>Scroll to explore</a>
     </section>
 
     <!-- ===== 02 COMMERCIAL ===== -->
@@ -367,6 +367,6 @@
     </symbol>
   </svg>
 
-  <script src="assets/js/cosmos.js?v=202610151454" defer></script>
+  <script src="assets/js/cosmos.js?v=202610151458" defer></script>
 </body>
 </html>

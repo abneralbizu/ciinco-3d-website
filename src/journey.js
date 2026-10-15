@@ -8,8 +8,8 @@ import { P } from './geo.js';
 // pos/look: [lat, lon, altitude m]. ox/oy: where the subject sits on screen (fraction of
 // the viewport, + = right / up) on wide screens; my: the same on portrait screens.
 export const KEYFRAMES = [
-  { name: 'Skyline', pos: [40.6965, -74.0215, 95], look: [40.7140, -74.0070, 200], ox: 0.26, oy: 0, my: 0.2, fov: 40, mob: 1.15 },
   { name: 'Offices', pos: [25.6, -80.6, 2700000], look: [35.6, -77.9, 0], ox: 0.24, oy: 0.02, my: 0.1, fov: 36, mob: 1.25 },
+  { name: 'Skyline', pos: [40.6965, -74.0215, 95], look: [40.7140, -74.0070, 200], ox: 0.26, oy: 0, my: 0.2, fov: 40, mob: 1.15 },
   { name: 'Commercial', pos: [40.7460, -74.0150, 230], look: [40.7585, -73.9850, 190], ox: 0.27, oy: 0, my: 0.12, fov: 40, mob: 1.3 },
   { name: 'Residential', pos: [28.6500, -81.2690, 115], look: [28.6560, -81.2600, 0], ox: -0.27, oy: 0, my: 0.14, fov: 40, mob: 1.25 },
   { name: 'Advisory', pos: [28.5408, -81.3712, 95], look: [28.5446, -81.3770, 105], ox: 0.28, oy: 0, my: 0.12, fov: 40, mob: 1.35 },

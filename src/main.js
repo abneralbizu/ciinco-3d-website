@@ -247,9 +247,7 @@ async function boot() {
       // Opening move. At the skyline: descend out of the clouds toward the harbour.
       // Anywhere else (a reload part-way down the page): just a gentle settle into place.
       const back = 1 - intro;
-      const atHero = Math.max(0, Math.min(1, 1 - pSmooth));
-      frame.pos.y *= 1 + back * (0.18 + 13.8 * atHero);
-      frame.pos.z += back * 40 * atHero;
+      frame.pos.y *= 1 + back * 0.35;
     }
     if (!reducedMotion.matches && finePointer) {
       parallax.x += (pointer.x - parallax.x) * (1 - Math.exp(-dt * 2.5));
@@ -282,13 +280,13 @@ async function boot() {
       const d = camera.position.distanceTo(o.pos);
       o.beam.scale.set(Math.max(0.12, d * 0.0035), Math.max(8, d * 0.45), Math.max(0.12, d * 0.0035));
       o.ring.scale.setScalar(Math.max(0.8, d * 0.06));
-      const on = Math.max(weight(1), weight(7) * (o.id === 'orlando' ? 1 : 0), weight(2) * (o.id === 'new-york' ? 1 : 0), weight(3) * (o.id === 'orlando' ? 1 : 0), 0.12);
+      const on = Math.max(weight(0), weight(7) * (o.id === 'orlando' ? 1 : 0), weight(2) * (o.id === 'new-york' ? 1 : 0), weight(3) * (o.id === 'orlando' ? 1 : 0), 0.12);
       o.beamMat.uniforms.uIntensity.value = 1.2 * on * (0.35 + 0.65 * smooth(4, 60, d)) * (hotOffice === o.id ? 1.8 : 1);
       o.ringMat.uniforms.uOn.value = on;
     });
     // flight arc
-    world.arc.uniforms.uOn.value = Math.max(smooth(0.4, 1, pSmooth) * (1 - smooth(1.4, 2.0, pSmooth)), frame.flight * (pSmooth > 2 && pSmooth < 3 ? 1 : 0));
-    world.arc.uniforms.uDraw.value += ((pSmooth > 0.6 ? 1.02 : 0) - world.arc.uniforms.uDraw.value) * (snap ? 1 : 1 - Math.exp(-dt * 1.2));
+    world.arc.uniforms.uOn.value = Math.max(1 - smooth(0.4, 1.0, pSmooth), frame.flight * (pSmooth > 2 && pSmooth < 3 ? 1 : 0));
+    world.arc.uniforms.uDraw.value += ((started ? 1.02 : 0) - world.arc.uniforms.uDraw.value) * (snap ? 1 : 1 - Math.exp(-dt * 1.2));
 
     // billboards face the camera
     world.billboards.forEach((b) => b.quaternion.copy(camera.quaternion));
@@ -336,13 +334,13 @@ async function boot() {
     // office labels
     officeLabels.forEach((ol) => {
       ol.el.classList.toggle('is-hot', hotOffice === ol.o.id);
-      const show = weight(1) > 0.5 || (ol.o.id === 'new-york' && weight(2) > 0.55) || (ol.o.id === 'orlando' && (weight(7) > 0.55 || weight(3) > 0.55));
+      const show = weight(0) > 0.5 || (ol.o.id === 'new-york' && weight(2) > 0.55) || (ol.o.id === 'orlando' && (weight(7) > 0.55 || weight(3) > 0.55));
       placeLabel(ol.el, ol.o.pos, show);
     });
 
     // hover over the cities on the map
     worldHit = null;
-    if (finePointer && pointer.inside && !pointer.overUI && weight(1) > 0.5) {
+    if (finePointer && pointer.inside && !pointer.overUI && weight(0) > 0.5) {
       for (const h of world.hit) {
         const s = screenOf(h.center);
         if (s.on && Math.hypot(s.x - pointer.px, s.y - pointer.py) < 70) worldHit = h;
