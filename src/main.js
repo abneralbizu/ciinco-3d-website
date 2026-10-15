@@ -244,10 +244,12 @@ async function boot() {
     sampleJourney(pSmooth, aspect, frame);
     if (debugCam) { frame.pos.copy(debugCam[0]); frame.look.copy(debugCam[1]); frame.ox = 0; frame.oy = 0; }
     if (intro < 1) {
-      // opening: descend out of the clouds toward the harbour
+      // Opening move. At the skyline: descend out of the clouds toward the harbour.
+      // Anywhere else (a reload part-way down the page): just a gentle settle into place.
       const back = 1 - intro;
-      frame.pos.y *= 1 + back * 14;
-      frame.pos.z += back * 40;
+      const atHero = Math.max(0, Math.min(1, 1 - pSmooth));
+      frame.pos.y *= 1 + back * (0.18 + 13.8 * atHero);
+      frame.pos.z += back * 40 * atHero;
     }
     if (!reducedMotion.matches && finePointer) {
       parallax.x += (pointer.x - parallax.x) * (1 - Math.exp(-dt * 2.5));
