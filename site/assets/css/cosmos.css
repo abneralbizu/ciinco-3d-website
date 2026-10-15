@@ -93,7 +93,7 @@ main:focus { outline: none; }
 /* 4. Stage & loader ---------------------------------------------------- */
 .stage { position: fixed; inset: 0; z-index: 0; pointer-events: none; }
 .stage canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block; pointer-events: auto; touch-action: pan-y; }
-.stage-fallback { position: absolute; inset: 0; display: none; background: radial-gradient(ellipse at 70% 40%, rgba(76, 60, 200, 0.25), transparent 60%), url("../textures/skybox-2k.webp") center / cover no-repeat, var(--bg); }
+.stage-fallback { position: absolute; inset: 0; display: none; background: radial-gradient(ellipse at 70% 40%, rgba(76, 60, 200, 0.25), transparent 60%), url("../images/og-image.jpg") center / cover no-repeat, var(--bg); }
 /* Edge shading so text always has something dark under it. */
 .stage::after {
   content: ""; position: absolute; inset: 0; pointer-events: none;
@@ -470,6 +470,7 @@ main { position: relative; z-index: 2; }
 .doc-center .big { font-weight: 200; font-stretch: 120%; font-size: clamp(5rem, 18vw, 11rem); line-height: 0.9; letter-spacing: -0.05em; background: linear-gradient(180deg, #fff, rgba(143, 182, 255, 0.35)); -webkit-background-clip: text; background-clip: text; color: transparent; margin: 0 0 12px; }
 .doc-center h1 em { font-family: var(--f-serif); font-style: italic; font-stretch: 100%; }
 .doc-center .cta-row { justify-content: center; }
+.doc-mark { width: 84px; height: 52px; margin-bottom: 26px; filter: drop-shadow(0 0 24px rgba(143, 182, 255, 0.45)); }
 .doc-orbit { width: 120px; height: 120px; margin-bottom: 28px; border-radius: 50%; position: relative; background: radial-gradient(circle at 35% 35%, #9fd8e6, #1d6f86 45%, #06233d 70%); box-shadow: inset -18px -14px 30px rgba(0, 0, 0, 0.75), 0 0 60px rgba(83, 214, 230, 0.25); }
 .doc-orbit::after { content: ""; position: absolute; inset: -26px; border-radius: 50%; border: 1px solid var(--line-2); transform: rotateX(72deg); animation: spin 14s linear infinite; }
 .doc-orbit::before { content: ""; position: absolute; width: 8px; height: 8px; border-radius: 50%; background: var(--gold); box-shadow: 0 0 12px var(--gold); top: 50%; left: -30px; animation: orbit 6s linear infinite; transform-origin: 90px 0; }

@@ -6,7 +6,7 @@
     "build": "esbuild src/main.js --bundle --minify --format=iife --target=es2019 --legal-comments=none --outfile=site/assets/js/cosmos.js",
     "dev": "esbuild src/main.js --bundle --sourcemap --format=iife --outfile=site/assets/js/cosmos.js --watch",
     "serve": "python3 -m http.server 8080 --directory site",
-    "textures": "node tools/export-geo.mjs && python3 tools/generate_textures.py"
+    "geo": "sh tools/fetch-data.sh && node tools/export-geo.mjs && python3 tools/build_geo.py"
   },
   "keywords": [],
   "author": "",
@@ -21,6 +21,7 @@
     "all-the-cities": "^3.1.0",
     "esbuild": "^0.24.0",
     "topojson-client": "^3.1.0",
+    "us-atlas": "^3.0.1",
     "world-atlas": "^2.0.2"
   },
   "private": true

@@ -1,18 +1,20 @@
-# CIIN Co. Cosmos
+# CIIN Co. 3D website
 
-An immersive 3D website for **Continental Investments International Network Co.** Visitors scroll through a
-small solar system where each world is one part of the business:
+An immersive 3D website for **Continental Investments International Network Co.** Visitors scroll through
+New York and Orlando at dusk. The camera flies between the two cities, and each place is one part of the business:
 
-| Chapter | World | Content |
+| Chapter | Scene | Content |
 |---|---|---|
-| 00 Launch | Sunrise over Earth | "Every property is its own world." |
-| 01 Home port | Earth, with Orlando and New York lit up | The two offices |
-| 02 Commercial | A ringed gas giant with an orbiting skyline | Buying, selling, leasing, due diligence, property types |
-| 03 Residential | Haven, a calm ocean world | Homes: buying, selling, renting, due diligence |
-| 04 Advisory | A constellation, one star per service | The 15 consulting services |
-| 05 Track record | A spiral galaxy | 36 years, $197M+ transactions, $35M under development |
-| 06 Listings | Inside the galaxy | Crexi listings, residential inquiries |
-| 07 Contact | Looking back over the galaxy | Agent, offices, contact form |
+| 00 Skyline | Lower Manhattan from the harbour | "From street level to skyline." |
+| 01 Our cities | Night map of the East Coast, a flight path from New York to Orlando | The two offices |
+| 02 Commercial | Midtown Manhattan from over the Hudson; one building lights up per property type | Buying, selling, leasing, due diligence |
+| 03 Residential | Homes, pools and lakes around the Winter Springs office | Buying, selling, renting, due diligence |
+| 04 Advisory | A glass tower by Lake Eola, one floor per service | The 15 consulting services |
+| 05 Track record | Downtown Orlando across Lake Eola at sunset | 36 years, $197M+ transactions, $35M under development |
+| 06 Listings | A plat map of lots in Colonialtown that lights up under the cursor | Crexi listings, residential inquiries |
+| 07 Contact | Above the Winter Springs office, Lake Jesup behind | Agent, offices, contact form |
+
+The earlier space version (planets and galaxies) is kept on the `space-version` branch.
 
 Every word on the page is ordinary HTML. The 3D scene is decoration behind it, so the site still works
 (with a still image instead) on devices without 3D graphics, and screen readers read it like any other page.
@@ -31,11 +33,12 @@ Handy preview switches (add to the address):
 
 - `?p=2` pins the camera on a chapter (0–7), for checking one scene.
 - `?low` forces the light version used on phones and older computers.
+- `?cam=lat,lon,altM,lookLat,lookLon,lookAltM` puts the camera anywhere, for framing new shots.
 
 ## Folder layout
 
 ```
-ciinco-cosmos/
+ciinco-3d-website/
 ├── site/                         ← THE WEBSITE. Publish this folder as-is.
 │   ├── index.html                The whole home page (all eight chapters)
 │   ├── privacy.html              Privacy policy
@@ -49,19 +52,22 @@ ciinco-cosmos/
 │   └── assets/
 │       ├── css/cosmos.css        All styling. Colours and fonts are at the top ("Tokens").
 │       ├── js/cosmos.js          The built 3D engine + page behaviour (generated, don't edit)
-│       ├── textures/             Planet, sky and light artwork (generated, see below)
+│       ├── textures/             East Coast night map (generated, see below)
+│       ├── data/                 New York shorelines, map bounds (generated)
 │       ├── images/               Favicon, social-share image, portrait, Equal Housing logo
 │       ├── fonts/                Archivo, Instrument Serif, JetBrains Mono (SIL OFL, licences included)
 │       └── docs/                 Signed SOP PDFs
 ├── src/                          Source for assets/js/cosmos.js
 │   ├── main.js                   Renderer, scroll → camera, interactions, quality control
-│   ├── world.js                  Builds the planets, rings, skyline, galaxy, stars
-│   ├── journey.js                The camera's flight plan (one keyframe per chapter)
-│   ├── shaders.js                GLSL for every surface (atmospheres, oceans, rings, galaxy…)
+│   ├── geo.js                    One map projection for everything, the Manhattan grid, office locations
+│   ├── world.js                  Builds New York, Orlando, the map, bridges, roads, homes, lakes
+│   ├── journey.js                The camera's flight plan (one keyframe per chapter, in lat/lon/altitude)
+│   ├── shaders.js                GLSL for every surface (sky, haze, streets, water, buildings, homes…)
 │   └── ui.js                     Navigation, reveals, counters, contact form, Crexi viewer
 ├── tools/
-│   ├── generate_textures.py      Paints every texture in site/assets/textures
-│   └── export-geo.mjs            Exports coastlines + cities used for the Earth texture
+│   ├── fetch-data.sh             Downloads the New York borough shorelines
+│   ├── export-geo.mjs            Exports coastlines, state lines and towns for the map
+│   └── build_geo.py              Builds nyc.json and the night-map texture
 ├── netlify.toml                  Netlify settings (publish folder = site, no build step)
 └── package.json                  Build scripts
 ```
@@ -73,27 +79,38 @@ ciinco-cosmos/
 - **Phone numbers, addresses, licence numbers:** in `site/index.html` (contact chapter, footer, structured data
   at the top) and the footers of the other pages.
 - **Colours and fonts:** the `:root` block at the top of `site/assets/css/cosmos.css`.
-- **Camera, planets, effects:** edit files in `src/`, then rebuild:
+- **Camera, buildings, effects:** edit files in `src/`, then rebuild:
 
   ```bash
   npm install          # once
   npm run build        # writes site/assets/js/cosmos.js
   ```
 
-  `src/journey.js` holds the camera position for each chapter; `src/world.js` holds where each world sits.
+  `src/journey.js` holds the camera position for each chapter as latitude, longitude and altitude;
+  `src/geo.js` holds the office locations; `src/world.js` builds the cities.
 
 ## The artwork
 
-All imagery is generated for this site. Nothing is stock. `tools/generate_textures.py` paints the planets,
-rings, moon, deep-space panorama and light sprites with procedural noise. Earth uses real coastlines
-(Natural Earth, public domain) and real city locations (GeoNames, CC BY 4.0, credited in the footer), so
-Orlando and New York light up where they really are. The social-share image is a render of the opening scene.
+Everything you see is generated for this site from open geographic data. There are no stock images.
 
-To regenerate (takes a few minutes):
+- **New York:** the real shorelines of the five boroughs (NYC Open Data), with the New Jersey and
+  Westchester waterfronts added. Manhattan's buildings stand on the real 1811 street grid, Central Park and
+  the Reservoir are where they belong, and the tallest towers and six bridges are placed at their real addresses.
+  Building heights follow the real pattern (Midtown, Downtown, Hudson Yards), but individual buildings are
+  generated massing, not surveyed models.
+- **Orlando:** Lake Eola, I-4, SR 408, SR 436, SR 417, SR 434, Red Bug Lake Road, Tuskawilla Road and
+  some twenty named lakes are placed from their real positions; downtown towers, neighbourhoods, homes,
+  pools and trees are generated around them.
+- **East Coast map:** Natural Earth coastlines (public domain), US Census state lines, and real towns
+  from GeoNames (CC BY 4.0, credited in the footer).
+- The office locations are approximate: 5th Ave & 30th St in New York, and Red Bug Lake Rd & Tuskawilla Rd
+  in Winter Springs.
+
+To rebuild the geography (about a minute):
 
 ```bash
 npm install
-npm run textures     # needs Python 3 with numpy + pillow
+npm run geo          # needs Python 3 with numpy, pillow and shapely
 ```
 
 ## Preview on GitHub Pages (before launch)
@@ -139,10 +156,11 @@ point the form at a form service and add that service to `form-action` and `conn
 
 ## Performance and accessibility
 
-- Phones and low-power computers automatically get lighter textures, fewer particles and no anti-aliasing.
+- Phones and low-power computers automatically get a lighter map, fewer buildings and homes, and no anti-aliasing.
   The site also watches its own frame rate for the first few seconds and lowers resolution if needed.
 - Rendering pauses when the tab is hidden.
-- `prefers-reduced-motion` switches off parallax, warp streaks, moving film grain, text animations and counters.
-- Without WebGL a still image of the deep-space panorama is shown.
+- `prefers-reduced-motion` switches off parallax, the opening descent, moving film grain, text animations and counters.
+- Without WebGL a still image of the skyline is shown.
+- The city detail fades out as the camera climbs, so the night map stays clean from high up.
 - Keyboard: skip link, visible focus, in-page links move focus to the chapter heading.
 - Checked with axe-core: no violations on any page.

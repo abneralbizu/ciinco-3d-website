@@ -102,13 +102,10 @@ export function initUI(bus) {
       navLinks.forEach((a) => a.setAttribute('aria-current', String(a.getAttribute('href') === `#${id}`)));
       if (sector) {
         const name = mapLinks[active] ? mapLinks[active].querySelector('.sm-name').textContent : '';
-        sector.textContent = `Sector ${String(active).padStart(2, '0')} · ${name}`;
+        sector.textContent = `${String(active).padStart(2, '0')} · ${name}`;
       }
     }
-    if (coords && cam) {
-      const f = (n) => (n < 0 ? '-' : '+') + String(Math.abs(Math.round(n))).padStart(4, '0');
-      coords.textContent = `X ${f(cam.x)} · Y ${f(cam.y)} · Z ${f(cam.z)}`;
-    }
+    if (coords && cam) coords.textContent = cam; // camera latitude, longitude, altitude
   };
 
   // Header: tinted once scrolled, hidden while scrolling down, back on scroll up.
