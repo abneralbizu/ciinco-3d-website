@@ -3,6 +3,9 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <!-- Google Maps Platform key for the photographed 3D cities. Left empty in the repository;
+       the deploy step fills it in from a GitHub Actions secret (see README). -->
+  <meta name="gmaps-key" content="">
   <title>CIIN Co. | Commercial &amp; Residential Real Estate, Florida and New York</title>
   <meta name="description" content="Continental Investments International Network Co. Commercial and residential real estate in Florida and commercial real estate in New York. Buying, selling, leasing, due diligence and advisory since 1990.">
   <meta name="theme-color" content="#03040a">
@@ -17,7 +20,7 @@
   <meta name="twitter:card" content="summary_large_image">
   <link rel="preload" href="assets/fonts/archivo-variable.woff2" as="font" type="font/woff2" crossorigin>
   <link rel="preload" href="assets/fonts/instrument-serif-italic.woff2" as="font" type="font/woff2" crossorigin>
-  <link rel="stylesheet" href="assets/css/cosmos.css?v=real1">
+  <link rel="stylesheet" href="assets/css/cosmos.css?v=tiles1">
   <script type="application/ld+json">
   {
     "@context": "https://schema.org",
@@ -98,6 +101,9 @@
     <button type="button" class="step-btn" id="step-prev" aria-label="Previous chapter"><span aria-hidden="true">↑</span></button>
     <button type="button" class="step-btn step-next" id="step-next" aria-label="Next chapter: Skyline"><span class="step-name mono" id="step-name">Skyline</span><span aria-hidden="true">↓</span></button>
   </nav>
+
+  <!-- Map data credit, shown while Google's 3D cities are on screen (required by Google). -->
+  <p class="map-credit" id="map-credit" hidden><span class="mc-logo">Google Maps</span> <span class="mc-data"></span></p>
 
   <div class="telemetry mono" aria-hidden="true">
     <span id="tm-sector">01 · Our cities</span>
@@ -383,6 +389,6 @@
     </symbol>
   </svg>
 
-  <script src="assets/js/cosmos.js?v=real1" defer></script>
+  <script src="assets/js/cosmos.js?v=tiles1" defer></script>
 </body>
 </html>

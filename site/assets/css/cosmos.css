@@ -164,7 +164,12 @@ body:not(.is-loading) .loader { opacity: 0; visibility: hidden; }
 
 .telemetry { position: fixed; left: var(--gutter); bottom: 22px; z-index: 50; display: flex; gap: 22px; color: var(--ink-3); font-size: 0.62rem; pointer-events: none; transition: opacity 0.5s; }
 .telemetry span:first-child { color: var(--ink-2); }
-body.at-footer .telemetry, body.at-footer .system-map, body.at-footer .stepper { opacity: 0; pointer-events: none; }
+body.at-footer .telemetry, body.at-footer .system-map, body.at-footer .stepper, body.at-footer .map-credit { opacity: 0; pointer-events: none; }
+
+/* Map data credit (Google 3D cities) */
+.map-credit { position: fixed; right: clamp(16px, 2.4vw, 36px); bottom: 18px; z-index: 50; margin: 0; max-width: min(60vw, 640px); font-size: 0.62rem; line-height: 1.4; color: rgba(238, 241, 248, 0.72); text-align: right; text-shadow: 0 1px 2px rgba(3, 4, 10, 0.9); transition: opacity 0.5s; pointer-events: none; }
+.map-credit[hidden] { display: none; }
+.mc-logo { font: 500 0.78rem/1 var(--f-sans); letter-spacing: 0; color: #fff; margin-right: 6px; }
 
 /* Previous / next chapter buttons: under the chapter list on wide screens, bottom corner on phones. */
 .stepper { position: fixed; right: clamp(16px, 2.4vw, 36px); top: calc(50% + 160px); z-index: 50; display: grid; justify-items: end; gap: 8px; transition: opacity 0.5s; }
@@ -418,6 +423,7 @@ main { position: relative; z-index: 2; overflow-x: clip; }
   .system-map { display: none; }
   .telemetry { display: none; }
   .stepper { top: auto; bottom: calc(16px + env(safe-area-inset-bottom)); right: 16px; grid-auto-flow: column; }
+  .map-credit { left: 16px; right: auto; bottom: calc(6px + env(safe-area-inset-bottom)); max-width: 55vw; text-align: left; font-size: 0.56rem; }
   .step-btn { height: 44px; min-width: 44px; }
   body.next-visible .stepper { opacity: 0; pointer-events: none; }
 }

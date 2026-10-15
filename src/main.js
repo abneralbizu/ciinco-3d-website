@@ -1,6 +1,6 @@
 // CIIN Co. 3D: entry point.
 import {
-  ACESFilmicToneMapping, Clock, HalfFloatType, LinearMipmapLinearFilter, LoadingManager, Matrix4,
+  ACESFilmicToneMapping, Clock, Color, HalfFloatType, LinearMipmapLinearFilter, LoadingManager, Matrix4,
   NoColorSpace, PerspectiveCamera, Ray, Scene, SRGBColorSpace, TextureLoader, Vector2, Vector3,
   WebGLRenderer, WebGLRenderTarget, Plane, Vector4,
 } from 'three';
@@ -10,6 +10,7 @@ import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js'
 import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
 import { ShaderPass } from 'three/addons/postprocessing/ShaderPass.js';
 import { buildWorld } from './world.js';
+import { createRealCities } from './realcity.js';
 import { sampleJourney, CHAPTERS } from './journey.js';
 import { unproject, altitudeM, P } from './geo.js';
 import { initUI, setLoader, finishLoading, reducedMotion } from './ui.js';
@@ -147,13 +148,34 @@ async function boot() {
     refl.q.set((Math.sign(refl.clip.x) + e[8]) / e[0], (Math.sign(refl.clip.y) + e[9]) / e[5], -1, (1 + e[10]) / e[14]);
     refl.clip.multiplyScalar(2 / refl.clip.dot(refl.q));
     e[2] = refl.clip.x; e[6] = refl.clip.y; e[10] = refl.clip.z + 1; e[14] = refl.clip.w;
+    const was = world.waterMeshes.map((w) => w.visible);
     world.waterMeshes.forEach((w) => { w.visible = false; });
     renderer.setRenderTarget(refl.rt);
     renderer.clear();
     renderer.render(scene, c);
     renderer.setRenderTarget(null);
-    world.waterMeshes.forEach((w) => { w.visible = true; });
+    world.waterMeshes.forEach((w, i) => { w.visible = was[i]; });
   }
+
+  // ---- Photographed cities (when a Google Maps key is configured) ----------------
+  const gkey = (document.querySelector('meta[name="gmaps-key"]')?.content || '').trim();
+  let real = null;
+  if (gkey && !params.has('generated')) {
+    try { real = createRealCities({ key: gkey, scene, camera, renderer, world }); } catch (e) { console.warn('3D tiles unavailable', e); }
+  }
+  // Night (generated cities) and golden hour (photographed cities) palettes for sky and haze.
+  const palette = {
+    night: { zenith: world.uZenith.value.clone(), horizon: world.sky.uniforms.uHorizon.value.clone(), glow: world.sky.uniforms.uGlow.value.clone(), cool: world.fog.cool.value.clone(), warm: world.fog.warm.value.clone() },
+    day: { zenith: new Color(0.035, 0.075, 0.2), horizon: new Color(0.3, 0.22, 0.25), glow: new Color(1.25, 0.55, 0.22), cool: new Color(0.13, 0.15, 0.23), warm: new Color(0.55, 0.32, 0.17) },
+  };
+  function applyPalette(t) {
+    world.uZenith.value.copy(palette.night.zenith).lerp(palette.day.zenith, t);
+    world.sky.uniforms.uHorizon.value.copy(palette.night.horizon).lerp(palette.day.horizon, t);
+    world.sky.uniforms.uGlow.value.copy(palette.night.glow).lerp(palette.day.glow, t);
+    world.fog.cool.value.copy(palette.night.cool).lerp(palette.day.cool, t);
+    world.fog.warm.value.copy(palette.night.warm).lerp(palette.day.warm, t);
+  }
+  let groundCheckAt = 0;
 
   // ---- Labels ----------------------------------------------------------------
   const labelRoot = document.getElementById('labels');
@@ -211,6 +233,7 @@ async function boot() {
     composer.setSize(w, h);
     world.uPixelRatio.value = dpr;
     sizeReflection();
+    if (real) real.resize();
     computeAnchors();
   }
   window.addEventListener('resize', resize);
@@ -403,8 +426,21 @@ async function boot() {
       if (worldHit && cursorLabel.textContent !== worldHit.label) cursorLabel.textContent = worldHit.label;
     }
 
-    // reflections only matter near the ground
-    const reflOn = refl.on && alt < 60 && world.fog.detail.value > 0.05;
+    // photographed cities: stream tiles for this view, blend the palette, stand the beams on the ground
+    if (real) {
+      real.update(alt, time);
+      applyPalette(world.sky.uniforms.uDay.value);
+      if (real.active && time - groundCheckAt > 1) {
+        groundCheckAt = time;
+        world.offices.forEach((o) => {
+          const y = real.groundAt(o.pos.x, o.pos.z);
+          if (y !== null) { o.ring.position.y = y + 0.02; o.beam.position.y = y; }
+        });
+      }
+    }
+    // reflections only matter near the ground (and, with photographed cities, only on New York's water)
+    const nearNYC = camera.position.distanceTo(world.nyc.center) < 400;
+    const reflOn = refl.on && alt < 60 && world.fog.detail.value > 0.05 && (!world.realCities || nearNYC);
     world.reflect.uReflectOn.value = reflOn ? 1 : 0;
     if (reflOn) renderReflection(-frame.ox * W(), frame.oy * H());
     composer.render(dt);

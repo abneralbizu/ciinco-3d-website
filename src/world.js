@@ -247,8 +247,9 @@ export function buildWorld(scene, tex, data, quality) {
   // ---- Sky ----------------------------------------------------------------
   {
     const m = mat(S.sky, {
-      uSunDir: fog.sun, uZenith, uHorizon: { value: new Color(0.018, 0.022, 0.075) }, uGlow: { value: new Color(0.95, 0.36, 0.14) }, uTime,
+      uSunDir: fog.sun, uZenith, uHorizon: { value: new Color(0.018, 0.022, 0.075) }, uGlow: { value: new Color(0.95, 0.36, 0.14) }, uTime, uDay: { value: 0 },
     }, { side: BackSide, depthWrite: false });
+    world.sky = m;
     const sky = new Mesh(new SphereGeometry(10, 48, 24), m);
     sky.renderOrder = -20;
     sky.frustumCulled = false;
@@ -293,6 +294,7 @@ export function buildWorld(scene, tex, data, quality) {
     water.renderOrder = -9;
     water.frustumCulled = false;
     nyc.add(water);
+    world.nycWater = water;
   }
   const groundMat = (mode, density, color) => mat(S.ground, {
     uMode: { value: mode }, uGridInv: { value: new Float32Array(4) }, uGridOrigin: { value: new Vector2() },
@@ -833,6 +835,7 @@ export function buildWorld(scene, tex, data, quality) {
     }
     geo.setAttribute('aFloor', new InstancedBufferAttribute(ids, 1));
     inst.frustumCulled = false;
+    inst.userData.keep = true;   // stays when the photographed city replaces the generated one
     orl.add(inst);
     world.tower = { uniforms: fm.uniforms, floorLocal: (i) => base.clone().setY(6 * upmO + i * (floorH + gap) + floorH / 2), base, n };
   }
@@ -1140,6 +1143,7 @@ export function buildWorld(scene, tex, data, quality) {
     });
     const lines = new LineSegments(g, pm);
     lines.frustumCulled = false;
+    lines.userData.keep = true;
     orl.add(lines);
     world.parcels = pm;
   }

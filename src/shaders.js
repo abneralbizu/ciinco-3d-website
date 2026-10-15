@@ -86,6 +86,7 @@ export const sky = {
     uniform vec3 uHorizon;
     uniform vec3 uGlow;
     uniform float uTime;
+    uniform float uDay;     // 0 night (generated cities), 1 golden hour (photographed cities)
     varying vec3 vDir;
     ${HASH}
     void main() {
@@ -107,7 +108,7 @@ export const sky = {
       vec2 f = fract(sp) - vec2(hash12(cell + 7.1), hash12(cell + 3.7));
       float star = step(0.985, r) * smoothstep(0.08, 0.0, length(f)) * smoothstep(0.12, 0.5, h);
       star *= 0.6 + 0.4 * sin(uTime * (1.0 + r * 3.0) + r * 60.0);
-      col += vec3(0.85, 0.9, 1.0) * star * 1.4;
+      col += vec3(0.85, 0.9, 1.0) * star * 1.4 * (1.0 - uDay);
       gl_FragColor = vec4(col, 1.0);
     }
   `,
@@ -1047,6 +1048,55 @@ export const finalPass = {
       col.b = texture2D(tDiffuse, vUv - off).b;
       col *= 1.0 - smoothstep(0.18, 0.75, d * uVignette * 1.6) * 0.5;
       col += (hash(vUv * 1000.0) - 0.5) * uGrain;
+      gl_FragColor = vec4(col, 1.0);
+    }
+  `,
+};
+
+// ---------------------------------------------------------------------------
+// Photographed cities (Google Photorealistic 3D Tiles): the daylight photo texture,
+// graded toward golden hour so it sits with the rest of the site, hazed with distance
+// and faded out at the edge of the city and high up.
+// ---------------------------------------------------------------------------
+export const tiles = {
+  vertexShader: /* glsl */ `
+    varying vec2 vUv;
+    varying vec3 vP;
+    void main() {
+      vUv = uv;
+      vec4 wp = modelMatrix * vec4(position, 1.0);
+      vP = wp.xyz;
+      gl_Position = projectionMatrix * viewMatrix * wp;
+    }
+  `,
+  fragmentShader: /* glsl */ `
+    uniform sampler2D map;
+    uniform float uFade;
+    uniform vec3 uCenter;
+    uniform float uRadius;
+    uniform float uExposure;
+    uniform float uSat;
+    ${FOG}
+    varying vec2 vUv;
+    varying vec3 vP;
+    void main() {
+      vec3 c = texture2D(map, vUv).rgb;
+      vec3 V = normalize(cameraPosition - vP);
+      vec3 N = normalize(cross(dFdx(vP), dFdy(vP)));
+      if (dot(N, V) < 0.0) N = -N;
+      float lum = dot(c, vec3(0.2126, 0.7152, 0.0722));
+      vec3 g = max(mix(vec3(lum), c, uSat), 0.0) * uExposure;
+      // low sun from the west: warm the faces that see it, cool the shade
+      vec2 sd = normalize(uSunDir.xz + 1e-5);
+      float west = max(dot(normalize(N.xz + 1e-5), sd), 0.0) * (1.0 - abs(N.y));
+      float lit = clamp(west * 0.9 + max(N.y, 0.0) * 0.35, 0.0, 1.0);
+      g *= mix(vec3(0.80, 0.87, 1.06), vec3(1.14, 0.97, 0.80), lit);
+      g = g / (1.0 + g * 0.35);                   // soften blown-out roofs and concrete
+      vec3 col = applyFog(g, vP);
+      float d = length(vP.xz - uCenter.xz) / uRadius;
+      vec3 haze = hazeColor(-V);
+      col = mix(col, haze, smoothstep(0.72, 1.0, d));
+      col = mix(haze, col, uFade);
       gl_FragColor = vec4(col, 1.0);
     }
   `,

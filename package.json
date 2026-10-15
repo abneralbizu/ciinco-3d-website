@@ -3,7 +3,7 @@
   "version": "1.0.0",
   "description": "CIIN Co. Cosmos: immersive 3D real estate website",
   "scripts": {
-    "build": "esbuild src/main.js --bundle --minify --format=iife --target=es2019 --legal-comments=none --outfile=site/assets/js/cosmos.js",
+    "build": "esbuild src/main.js --bundle --minify --format=iife --target=es2020 --legal-comments=none --outfile=site/assets/js/cosmos.js",
     "dev": "esbuild src/main.js --bundle --sourcemap --format=iife --outfile=site/assets/js/cosmos.js --watch",
     "serve": "python3 -m http.server 8080 --directory site",
     "geo": "sh tools/fetch-data.sh && node tools/export-geo.mjs && python3 tools/build_geo.py"
@@ -12,6 +12,7 @@
   "author": "",
   "license": "UNLICENSED",
   "dependencies": {
+    "3d-tiles-renderer": "^0.5.3",
     "three": "^0.169.0"
   },
   "devDependencies": {
