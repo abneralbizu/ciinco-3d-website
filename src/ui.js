@@ -95,10 +95,34 @@ export function initUI(bus) {
   const sector = $('#tm-sector');
   const coords = $('#tm-coords');
   let lastActive = -1;
+
+  // Previous / next buttons beside the chapter list.
+  const stepPrev = $('#step-prev');
+  const stepNext = $('#step-next');
+  const stepName = $('#step-name');
+  const chapterName = (i) => (mapLinks[i] ? mapLinks[i].querySelector('.sm-name').textContent : '');
+  const current = () => Math.max(0, lastActive);
+  const updateStepper = () => {
+    const i = current();
+    if (stepPrev) {
+      stepPrev.hidden = i === 0;
+      stepPrev.setAttribute('aria-label', `Previous chapter: ${chapterName(i - 1)}`);
+    }
+    if (stepNext) {
+      stepNext.hidden = i >= chapters.length - 1;
+      stepNext.setAttribute('aria-label', `Next chapter: ${chapterName(i + 1)}`);
+      if (stepName) stepName.textContent = chapterName(i + 1);
+    }
+  };
+  if (stepPrev) stepPrev.addEventListener('click', () => goToChapter(Math.max(0, current() - 1)));
+  if (stepNext) stepNext.addEventListener('click', () => goToChapter(Math.min(chapters.length - 1, current() + 1)));
+  updateStepper();
+
   bus.setProgress = (p, active, cam) => {
     if (fill) fill.style.transform = `scaleY(${(p / (chapters.length - 1)).toFixed(4)})`;
     if (active !== lastActive) {
       lastActive = active;
+      updateStepper();
       document.body.dataset.side = SIDES[active] || 'left';
       mapLinks.forEach((a, i) => a.classList.toggle('is-active', i === active));
       const id = chapters[active] && chapters[active].id;
