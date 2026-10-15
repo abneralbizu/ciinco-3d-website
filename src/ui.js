@@ -105,7 +105,7 @@ export function initUI(bus) {
       navLinks.forEach((a) => a.setAttribute('aria-current', String(a.getAttribute('href') === `#${id}`)));
       if (sector) {
         const name = mapLinks[active] ? mapLinks[active].querySelector('.sm-name').textContent : '';
-        sector.textContent = `${String(active).padStart(2, '0')} · ${name}`;
+        sector.textContent = `${String(active + 1).padStart(2, '0')} · ${name}`;
       }
     }
     if (coords && cam) coords.textContent = cam; // camera latitude, longitude, altitude
