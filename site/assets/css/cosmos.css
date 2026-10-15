@@ -95,6 +95,15 @@ main:focus { outline: none; }
 .stage canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block; pointer-events: auto; touch-action: pan-y; }
 .stage-fallback { position: absolute; inset: 0; display: none; background: radial-gradient(ellipse at 70% 40%, rgba(76, 60, 200, 0.25), transparent 60%), url("../images/og-image.jpg") center / cover no-repeat, var(--bg); }
 /* Edge shading so text always has something dark under it. */
+/* Shade behind whichever side holds the text, so it reads over a lit city. */
+.scrim { position: absolute; inset: 0; pointer-events: none; opacity: 0; transition: opacity 0.9s var(--ease-io); }
+.scrim-left { background: linear-gradient(90deg, rgba(3, 4, 10, 0.86) 0%, rgba(3, 4, 10, 0.72) 30%, rgba(3, 4, 10, 0.32) 50%, rgba(3, 4, 10, 0) 66%); }
+.scrim-right { background: linear-gradient(270deg, rgba(3, 4, 10, 0.86) 0%, rgba(3, 4, 10, 0.72) 30%, rgba(3, 4, 10, 0.32) 50%, rgba(3, 4, 10, 0) 66%); }
+.scrim-center { background: radial-gradient(ellipse 62% 58% at 50% 50%, rgba(3, 4, 10, 0.78), rgba(3, 4, 10, 0.45) 55%, rgba(3, 4, 10, 0) 85%); }
+body[data-side="left"] .scrim-left, body[data-side="right"] .scrim-right, body[data-side="center"] .scrim-center { opacity: 1; }
+@media (max-width: 860px) {
+  .scrim-left, .scrim-right, .scrim-center { background: linear-gradient(0deg, rgba(3, 4, 10, 0.9) 0%, rgba(3, 4, 10, 0.7) 45%, rgba(3, 4, 10, 0.15) 75%, rgba(3, 4, 10, 0) 90%); }
+}
 .stage::after {
   content: ""; position: absolute; inset: 0; pointer-events: none;
   background:
@@ -240,6 +249,13 @@ main { position: relative; z-index: 2; }
 .body { margin: 22px 0 0; color: var(--ink-2); max-width: 36rem; }
 .body-center { margin-inline: auto; }
 .note { margin: 28px 0 0; padding: 14px 18px; border-left: 1px solid var(--gold); color: var(--ink-2); font-size: 0.9rem; background: linear-gradient(90deg, rgba(236, 209, 164, 0.07), transparent); }
+
+/* A faint dark halo keeps small text crisp over bright windows. */
+.eyebrow, .kicker, .lede, .body, .note, .services, .types-label, .consulting, .stats, .listing-links, .crexi-note, .agent, .hours, .office-coords {
+  text-shadow: 0 1px 2px rgba(3, 4, 10, 0.75), 0 0 14px rgba(3, 4, 10, 0.85), 0 0 28px rgba(3, 4, 10, 0.6);
+}
+.display, .display-2 { text-shadow: 0 2px 30px rgba(3, 4, 10, 0.55); }
+.display em { text-shadow: none; filter: drop-shadow(0 2px 18px rgba(3, 4, 10, 0.6)); }
 
 /* 7. Components ---------------------------------------------------------- */
 .btn {

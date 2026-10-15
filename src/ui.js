@@ -6,6 +6,8 @@ const $$ = (s, el = document) => Array.from(el.querySelectorAll(s));
 export const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)');
 
 export const FOUNDED = 1990;
+// Which side of the screen each chapter's text sits on (drives the shading behind it).
+const SIDES = ['left', 'left', 'left', 'right', 'left', 'center', 'right', 'left'];
 
 export function initUI(bus) {
   const chapters = $$('.chapter');
@@ -97,6 +99,7 @@ export function initUI(bus) {
     if (fill) fill.style.transform = `scaleY(${(p / (chapters.length - 1)).toFixed(4)})`;
     if (active !== lastActive) {
       lastActive = active;
+      document.body.dataset.side = SIDES[active] || 'left';
       mapLinks.forEach((a, i) => a.classList.toggle('is-active', i === active));
       const id = chapters[active] && chapters[active].id;
       navLinks.forEach((a) => a.setAttribute('aria-current', String(a.getAttribute('href') === `#${id}`)));

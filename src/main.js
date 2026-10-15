@@ -200,9 +200,20 @@ async function boot() {
     tmp.copy(v).project(camera);
     return { x: (tmp.x * 0.5 + 0.5) * W(), y: (-tmp.y * 0.5 + 0.5) * H(), on: tmp.z < 1 && Math.abs(tmp.x) < 1.1 && Math.abs(tmp.y) < 1.1 };
   }
+  // Screen area taken by the current chapter's text: 3D labels never sit underneath it.
+  let textRect = null;
+  let textRectAt = -1;
+  function updateTextRect(active) {
+    const ch = chapters[active];
+    const el = ch && (ch.querySelector('.panel') || ch.querySelector('.contact-intro') || ch.querySelector('.wrap'));
+    const r = el ? el.getBoundingClientRect() : null;
+    textRect = r && r.width ? { l: r.left - 28, r: r.right + 28, t: r.top - 20, b: r.bottom + 20 } : null;
+  }
   function placeLabel(el, v, show, dx = 0, dy = 0) {
     const s = screenOf(v);
-    const visible = show && s.on;
+    const x = s.x + dx, y = s.y + dy;
+    const underText = textRect && x > textRect.l && x < textRect.r && y > textRect.t && y < textRect.b;
+    const visible = show && s.on && !underText;
     el.classList.toggle('is-on', visible);
     if (visible) el.style.transform = `translate3d(${(s.x + dx).toFixed(1)}px, ${(s.y + dy).toFixed(1)}px, 0) translate(-3px, -50%)`;
   }
@@ -221,6 +232,7 @@ async function boot() {
 
     p = progressFromScroll();
     const snap = pinnedP !== null;
+    if (time - textRectAt > 0.25) { textRectAt = time; updateTextRect(Math.round(p)); }
     const kk = reducedMotion.matches ? 12 : 3.0;
     pSmooth += (p - pSmooth) * (1 - Math.exp(-dt * kk));
     if (Math.abs(p - pSmooth) < 1e-4 || snap) pSmooth = p;
