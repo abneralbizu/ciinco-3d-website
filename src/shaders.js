@@ -87,6 +87,8 @@ export const sky = {
     uniform vec3 uGlow;
     uniform float uTime;
     uniform float uDay;     // 0 night (generated cities), 1 golden hour (photographed cities)
+    uniform sampler2D uPhoto;  // dusk sky photograph (Canva), horizon at the bottom
+    uniform float uPhotoOn;
     varying vec3 vDir;
     ${HASH}
     void main() {
@@ -99,6 +101,23 @@ export const sky = {
       float band = exp(-max(h, 0.0) * 9.0) * smoothstep(-0.25, 0.02, h);
       col += uGlow * band * (0.06 + pow(facing, 6.0) * 0.6);
       col += vec3(0.075, 0.045, 0.03) * exp(-max(h, 0.0) * 14.0) * smoothstep(-0.06, 0.0, h);   // city glow on the haze
+      // the photographed dusk sky around the horizon: warmest toward the sun, mirrored around
+      // the view so there is no seam, fading into the drawn sky overhead
+      if (uPhotoOn > 0.5) {
+        float rel = atan(d.z, d.x) - atan(uSunDir.z, uSunDir.x);
+        rel = mod(rel + 3.14159265, 6.2831853) - 3.14159265;
+        float x = 0.5 + rel * 2.0 / 3.14159265;            // one photo width per 90 degrees, 4 mirrored copies
+        x = 1.0 - abs(fract(x * 0.5) * 2.0 - 1.0);          // mirror the photo across the full circle
+        vec2 uv = vec2(0.01 + x * 0.98, clamp(h / 0.5, 0.0, 1.0) * 0.97 + 0.015);
+        vec3 ph = texture2D(uPhoto, uv, -0.5).rgb;
+        float away = 1.0 - pow(facing, 0.7);
+        // away from the sunset only the blue of the sky survives; the clouds there are in shadow
+        float lum = dot(ph, vec3(0.3, 0.55, 0.15));
+        ph = mix(ph, vec3(0.18, 0.24, 0.5) * lum + ph * vec3(0.1, 0.12, 0.3), away * 0.85);
+        float gain = mix(0.16, 0.55, uDay) * mix(1.0, 0.4, away);
+        float m = smoothstep(-0.03, 0.01, h) * (1.0 - smoothstep(0.32, 0.6, h)) * mix(1.0, 0.5, away);
+        col = mix(col, ph * gain, m);
+      }
       // below the horizon: deep haze
       col = mix(col, uHorizon * 0.55, smoothstep(0.0, -0.2, h));
       // stars, fading in toward the zenith
@@ -330,6 +349,9 @@ export const buildings = {
     uniform float uHot;
     uniform float uHotOn;
     uniform vec3 uZenith;
+    uniform sampler2D uBrick;   // facade photographs (Canva): brick walk-up and glass office tower
+    uniform sampler2D uGlass;
+    uniform float uFacadeOn;
     ${FOG}
     ${HASH}
     ${NIGHT}
@@ -447,6 +469,22 @@ export const buildings = {
       if (plant > 0.5) {
         float louver = step(0.5, fract(yM / 0.6)) * 0.5 + 0.5;
         col = wall * louver;
+      }
+
+      // Photographed facades on brick and glass buildings, close enough to read the windows.
+      // Each building starts the photo at its own offset (and some mirror it) so the repeat is hidden.
+      float brickish = step(s, 0.40) * (1.0 - glassy) * (1.0 - florida) * (1.0 - plant);
+      float photoFacade = (brickish + glassy) * uFacadeOn * side * step(4.6, yM);
+      if (photoFacade > 0.0) {
+        float span = glassy > 0.5 ? 26.0 : 19.0;                 // metres the photo covers
+        vec2 off = vec2(hash12(vec2(vSeed, 1.0)), floor(hash12(vec2(vSeed, 2.0)) * 6.0) / 6.0);
+        vec2 tuv = vec2(uM / span + off.x, (yM - 4.6) / span + off.y);
+        if (fract(vSeed * 5.7) > 0.5) tuv.x = -tuv.x;
+        vec3 ph = glassy > 0.5 ? texture2D(uGlass, tuv).rgb : texture2D(uBrick, tuv).rgb;
+        // the photos are already lit at dusk; scale them into the scene's light
+        vec3 phCol = ph * (glassy > 0.5 ? 0.55 : 0.42) + amb * 0.02;
+        float nearW = 1.0 - smoothstep(0.35, 0.9, blur);
+        col = mix(col, phCol, nearW * photoFacade);
       }
 
       // street level: shopfronts and lobbies

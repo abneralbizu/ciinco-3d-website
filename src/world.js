@@ -247,7 +247,7 @@ export function buildWorld(scene, tex, data, quality) {
   // ---- Sky ----------------------------------------------------------------
   {
     const m = mat(S.sky, {
-      uSunDir: fog.sun, uZenith, uHorizon: { value: new Color(0.018, 0.022, 0.075) }, uGlow: { value: new Color(0.95, 0.36, 0.14) }, uTime, uDay: { value: 0 },
+      uSunDir: fog.sun, uZenith, uHorizon: { value: new Color(0.018, 0.022, 0.075) }, uGlow: { value: new Color(0.95, 0.36, 0.14) }, uTime, uDay: { value: 0 }, uPhoto: { value: tex.sky }, uPhotoOn: { value: tex.sky ? 1 : 0 },
     }, { side: BackSide, depthWrite: false });
     world.sky = m;
     const sky = new Mesh(new SphereGeometry(10, 48, 24), m);
@@ -505,7 +505,8 @@ export function buildWorld(scene, tex, data, quality) {
       }
     }
   }
-  const bUniforms = { uTime, uUnitsPerM: { value: upmN }, uHot: { value: -1 }, uHotOn: { value: 0 }, uZenith, ...F };
+  const facades = { uBrick: { value: tex.brick }, uGlass: { value: tex.glass }, uFacadeOn: { value: tex.brick && tex.glass ? 1 : 0 } };
+  const bUniforms = { uTime, uUnitsPerM: { value: upmN }, uHot: { value: -1 }, uHotOn: { value: 0 }, uZenith, ...facades, ...F };
   const nycBuildings = nycBoxes.mesh(mat(S.buildings, bUniforms));
   nyc.add(nycBuildings);
   // Rooftop water tanks: wooden barrels on steel stands, the New York signature.
@@ -1122,7 +1123,7 @@ export function buildWorld(scene, tex, data, quality) {
     }
     world.homeCount = nHouse;
   }
-  const orlUniforms = { uTime, uUnitsPerM: { value: upmO }, uHot: { value: -1 }, uHotOn: { value: 0 }, uZenith, ...F };
+  const orlUniforms = { uTime, uUnitsPerM: { value: upmO }, uHot: { value: -1 }, uHotOn: { value: 0 }, uZenith, ...facades, ...F };
   orl.add(orlBoxes.mesh(mat(S.buildings, orlUniforms)));
 
   // Parcel lines (Listings)

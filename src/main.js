@@ -1,6 +1,6 @@
 // CIIN Co. 3D: entry point.
 import {
-  ACESFilmicToneMapping, Clock, Color, HalfFloatType, LinearMipmapLinearFilter, LoadingManager, Matrix4,
+  ACESFilmicToneMapping, Clock, Color, ClampToEdgeWrapping, RepeatWrapping, HalfFloatType, LinearMipmapLinearFilter, LoadingManager, Matrix4,
   NoColorSpace, PerspectiveCamera, Ray, Scene, SRGBColorSpace, TextureLoader, Vector2, Vector3,
   WebGLRenderer, WebGLRenderTarget, Plane, Vector4,
 } from 'three';
@@ -79,7 +79,7 @@ async function boot() {
 
   // ---- Data + textures ---------------------------------------------------------
   let done = 0;
-  const total = 3;
+  const total = 6;
   const bump = () => setLoader((++done / total) * 0.85);
   const manager = new LoadingManager();
   const loader = new TextureLoader(manager);
@@ -89,10 +89,18 @@ async function boot() {
     t.anisotropy = Math.min(8, renderer.capabilities.getMaxAnisotropy());
     t.minFilter = LinearMipmapLinearFilter;
   });
+  // Photographs made in Canva: the dusk sky, and brick and glass facades for the generated buildings.
+  const photo = (name, wrap) => new Promise((res) => {
+    const t = loader.load(`assets/textures/${name}.webp`, () => { bump(); res(t); }, undefined, () => { bump(); res(null); });
+    t.colorSpace = SRGBColorSpace;
+    t.wrapS = t.wrapT = wrap;
+    t.anisotropy = Math.min(8, renderer.capabilities.getMaxAnisotropy());
+  });
+  const [skyTex, brickTex, glassTex] = await Promise.all([photo('sky-dusk', ClampToEdgeWrapping), photo('facade-brick', RepeatWrapping), photo('facade-glass', RepeatWrapping)]);
   const getJSON = (u) => fetch(u).then((r) => r.json()).then((j) => { bump(); return j; });
   const [nyc, map] = await Promise.all([getJSON('assets/data/nyc.json'), getJSON('assets/data/map.json')]);
 
-  const world = buildWorld(scene, { map: mapTex }, { nyc, map }, quality);
+  const world = buildWorld(scene, { map: mapTex, sky: skyTex, brick: brickTex, glass: glassTex }, { nyc, map }, quality);
   if (params.has('debug')) console.info('stats', JSON.stringify({ nycBuildings: world.nycBuildings.count, homes: world.homeCount, ...world.stats }));
 
   // ---- Post-processing ---------------------------------------------------------
