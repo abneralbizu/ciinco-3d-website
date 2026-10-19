@@ -838,7 +838,7 @@ export function buildWorld(scene, tex, data, quality) {
     inst.frustumCulled = false;
     inst.userData.keep = true;   // stays when the photographed city replaces the generated one
     orl.add(inst);
-    world.tower = { uniforms: fm.uniforms, floorLocal: (i) => base.clone().setY(6 * upmO + i * (floorH + gap) + floorH / 2), base, n };
+    world.tower = { mesh: inst, uniforms: fm.uniforms, floorLocal: (i) => base.clone().setY(6 * upmO + i * (floorH + gap) + floorH / 2), base, n };
   }
   // Lake Eola fountain
   {
@@ -1147,6 +1147,7 @@ export function buildWorld(scene, tex, data, quality) {
     lines.userData.keep = true;
     orl.add(lines);
     world.parcels = pm;
+    world.parcelLines = lines;
   }
 
   // =========================================================================

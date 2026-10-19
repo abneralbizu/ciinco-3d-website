@@ -515,3 +515,6 @@ main { position: relative; z-index: 2; overflow-x: clip; }
 .doc-orbit::before { content: ""; position: absolute; width: 8px; height: 8px; border-radius: 50%; background: var(--gold); box-shadow: 0 0 12px var(--gold); top: 50%; left: -30px; animation: orbit 6s linear infinite; transform-origin: 90px 0; }
 @keyframes spin { to { transform: rotateX(72deg) rotate(360deg); } }
 @keyframes orbit { to { transform: rotate(360deg); } }
+
+/* Photographed cities: hide hints that refer to the drawn 3D extras. */
+body.real-cities .gen-only { display: none; }

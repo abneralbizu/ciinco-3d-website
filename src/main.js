@@ -360,8 +360,10 @@ async function boot() {
       o.beam.scale.set(Math.max(0.12, d * 0.0035), Math.max(8, d * 0.45), Math.max(0.12, d * 0.0035));
       o.ring.scale.setScalar(Math.max(0.8, d * 0.06));
       const on = Math.max(weight(0), weight(7) * (o.id === 'orlando' ? 1 : 0), weight(2) * (o.id === 'new-york' ? 1 : 0), weight(3) * (o.id === 'orlando' ? 1 : 0), 0.12);
-      o.beamMat.uniforms.uIntensity.value = 1.2 * on * (0.35 + 0.65 * smooth(4, 60, d)) * (hotOffice === o.id ? 1.8 : 1);
-      o.ringMat.uniforms.uOn.value = on;
+      // over the photographed cities the light columns only show from the air (the map), never at street level
+      const air = world.realCities ? smooth(150, 1500, alt) : 1;
+      o.beamMat.uniforms.uIntensity.value = 1.2 * on * air * (0.35 + 0.65 * smooth(4, 60, d)) * (hotOffice === o.id ? 1.8 : 1);
+      o.ringMat.uniforms.uOn.value = on * air;
     });
     // flight arc
     world.arc.uniforms.uOn.value = Math.max(1 - smooth(0.4, 1.0, pSmooth), frame.flight * (pSmooth > 2 && pSmooth < 3 ? 1 : 0));
@@ -379,7 +381,7 @@ async function boot() {
     typeLabels.forEach((t, i) => {
       t.el.classList.toggle('is-hot', hotType === i);
       tmp2.copy(t.t.local).add(world.nyc.center);
-      placeLabel(t.el, tmp2.clone(), wC > 0.55 && aspect > 0.9);
+      placeLabel(t.el, tmp2.clone(), wC > 0.55 && aspect > 0.9 && !world.realCities);
     });
 
     // advisory tower floors
@@ -391,7 +393,7 @@ async function boot() {
     floorLabels.forEach((fl) => {
       fl.el.classList.toggle('is-hot', hotNode === fl.i);
       tmp2.copy(tw.floorLocal(fl.i)).add(world.orl.center);
-      const show = wA > 0.55 && (aspect > 0.9 || hotNode === fl.i) && tw.uniforms.uDraw.value > fl.i / 15 + 0.05;
+      const show = !world.realCities && wA > 0.55 && (aspect > 0.9 || hotNode === fl.i) && tw.uniforms.uDraw.value > fl.i / 15 + 0.05;
       placeLabel(fl.el, tmp2.clone(), show, 26, 0);
     });
 
@@ -445,6 +447,12 @@ async function boot() {
           if (y !== null) { o.ring.position.y = y + 0.02; o.beam.position.y = y; }
         });
       }
+    }
+    // drawn extras (glowing advisory tower, parcel grid) give way to the photographed cities
+    if (world.tower.mesh.visible === !!world.realCities) {
+      world.tower.mesh.visible = !world.realCities;
+      world.parcelLines.visible = !world.realCities;
+      document.body.classList.toggle('real-cities', !!world.realCities);
     }
     // reflections only matter near the ground (and, with photographed cities, only on New York's water)
     const nearNYC = camera.position.distanceTo(world.nyc.center) < 400;
