@@ -308,6 +308,9 @@ async function boot() {
     const time = clock.elapsedTime;
     world.uTime.value = time;
     final.uniforms.uTime.value = reducedMotion.matches ? 0 : time;
+    // film grain and lens fringing suit the night map, not photographs
+    final.uniforms.uGrain.value = world.realCities ? 0.01 : 0.028;
+    final.uniforms.uAberration.value = world.realCities ? 0 : 0.0006;
 
     p = progressFromScroll();
     const snap = pinnedP !== null;
@@ -467,7 +470,8 @@ async function boot() {
       bus.setProgress(p, Math.round(p), `${fmtLat(ll.lat)} · ${fmtLon(ll.lon)} · ALT ${fmtAlt(altitudeM(alt, ll.lat))}`);
     }
 
-    if (started && perf.checked < 4) {
+    // (not while photographed tiles are streaming in: parsing them is a one-off cost, not the steady frame rate)
+    if (started && perf.checked < 4 && !(real && real.busy)) {
       perf.frames++; perf.acc += dt;
       if (perf.frames >= 90) {
         const avg = perf.acc / perf.frames;

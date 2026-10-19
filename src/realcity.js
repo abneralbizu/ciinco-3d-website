@@ -50,7 +50,15 @@ export function createRealCities({ key, scene, camera, renderer, world }) {
     },
   };
   tiles.registerPlugin(mask);
-  tiles.errorTarget = window.matchMedia('(max-width: 860px)').matches ? 28 : 20;
+  // Detail: screen-space error in device pixels. Lower is sharper; Retina screens get a little
+  // more slack per device pixel so they don't pull four times the data.
+  const phone = window.matchMedia('(max-width: 860px)').matches;
+  const setDetail = () => { tiles.errorTarget = (phone ? 12 : 7) * Math.sqrt(Math.max(1, renderer.getPixelRatio())); };
+  setDetail();
+  tiles.downloadQueue.maxJobsPerOrigin = phone ? 10 : 16;
+  tiles.parseQueue.maxJobs = phone ? 4 : 8;
+  tiles.lruCache.maxBytesSize = (phone ? 0.35 : 0.7) * 1024 ** 3;
+  const aniso = Math.min(8, renderer.capabilities.getMaxAnisotropy());
   tiles.setCamera(camera);
   tiles.setResolutionFromRenderer(camera, renderer);
   tiles.group.matrixAutoUpdate = false;
@@ -59,7 +67,7 @@ export function createRealCities({ key, scene, camera, renderer, world }) {
   const frames = { nyc: cityFrame(CITIES.nyc), orl: cityFrame(CITIES.orl) };
   const uniforms = {
     uFade: { value: 0 }, uCenter: { value: new Vector3() }, uRadius: { value: 1 },
-    uExposure: { value: 0.62 }, uSat: { value: 1.05 }, ...S.fogUniforms(world.fog),
+    uExposure: { value: 0.86 }, uSat: { value: 0.96 }, ...S.fogUniforms(world.fog),
   };
   let city = null;
   function useCity(id) {
@@ -80,32 +88,47 @@ export function createRealCities({ key, scene, camera, renderer, world }) {
   tiles.addEventListener('load-model', ({ scene: model, tile }) => {
     model.traverse((o) => {
       if (!o.isMesh) return;
+      const tex = o.material.map;
+      if (tex) { tex.anisotropy = aniso; tex.needsUpdate = true; }
       const m = new ShaderMaterial({
         vertexShader: S.tiles.vertexShader,
         fragmentShader: S.tiles.fragmentShader,
-        uniforms: { ...uniforms, map: { value: o.material.map } },
+        uniforms: { ...uniforms, map: { value: tex } },
       });
       tile.engineData.materials.push(m);
       o.material = m;
     });
   });
 
-  // Ready once the first city tiles arrive; on any failure the generated cities come back.
+  // A city switches from the drawn version to the photographed one only once the tiles for
+  // the current view have finished streaming (or after a few seconds, whatever has arrived),
+  // then fades in, so nobody sees an empty harbour or half-loaded shards.
   const state = { ok: false, failed: false, loaded: 0 };
-  tiles.addEventListener('load-model', () => { state.loaded++; if (!state.ok && !state.failed) { state.ok = true; setGenerated(false); } });
+  const ready = { nyc: false, orl: false };
+  const since = { nyc: 0, orl: 0 };
+  let reveal = 0;      // 0..1 fade-in of the photographed city
+  let idle = 0;        // seconds the tile queue has been empty (one refinement wave can end before the next starts)
+  let lastT = 0;
+  tiles.addEventListener('load-model', () => { state.loaded++; if (!state.failed) state.ok = true; });
   tiles.addEventListener('load-error', (e) => {
-    if (!state.ok && (e.tile == null || e.tile === tiles.root)) { state.failed = true; setGenerated(true); }
+    if (!state.ok && (e.tile == null || e.tile === tiles.root)) { state.failed = true; setGenerated('nyc', true); setGenerated('orl', true); }
     console.warn('3D tiles:', e.error || e);
   });
+  let streaming = false;
+  function markReady(id) {
+    if (ready[id]) return;
+    ready[id] = true;
+    setGenerated(id, false);
+  }
 
-  // Hide the generated city (but keep the advisory tower, the parcel overlay and the harbour water).
-  function setGenerated(on) {
-    for (const g of [world.nyc.group, world.orl.group]) {
-      g.children.forEach((c) => { if (!c.userData.keep && c !== world.nycWater) c.visible = on; });
+  // Hide one drawn city (but keep the advisory tower, the parcel overlay and the harbour water).
+  function setGenerated(id, on) {
+    const g = world[id].group;
+    g.children.forEach((c) => { if (!c.userData.keep && c !== world.nycWater) c.visible = on; });
+    if (id === 'nyc') {
+      if (world.nycWater) world.nycWater.position.y = on ? -0.3 : 0.5 * frames.nyc.upm;   // real sea level
+      world.reflect.uMirrorY.value = on ? 0 : 0.5 * frames.nyc.upm;
     }
-    if (world.nycWater) world.nycWater.position.y = on ? -0.3 : 0.5 * frames.nyc.upm;   // real sea level
-    world.reflect.uMirrorY.value = on ? 0 : 0.5 * frames.nyc.upm;
-    world.realCities = !on;
   }
 
   // Ground height under a point (for the office beams), from the loaded tiles.
@@ -127,20 +150,36 @@ export function createRealCities({ key, scene, camera, renderer, world }) {
 
   return {
     tiles,
-    get active() { return state.ok && !state.failed; },
+    get active() { return state.ok && !state.failed && !!ready[city]; },
+    /** True while the current view is still streaming (frame-time checks should wait). */
+    get busy() { return streaming && !ready[city]; },
     update(alt, time) {
+      const dt = Math.min(0.1, Math.max(0, time - lastT));
+      lastT = time;
       // which city: whichever centre the camera is over
       const dn = camera.position.distanceTo(frames.nyc.center), dor = camera.position.distanceTo(frames.orl.center);
+      const prev = city;
       useCity(dn < dor ? 'nyc' : 'orl');
+      if (city !== prev) { reveal = ready[city] ? 1 : 0; idle = 0; }
       // photographed city from street level up to ~25 km, then the night map takes over
       const fade = 1 - Math.min(1, Math.max(0, (alt - 120) / 180));
-      uniforms.uFade.value = fade;
-      tiles.group.visible = fade > 0.01 && !state.failed;
-      world.sky.uniforms.uDay.value = state.ok ? fade : 0;
-      if (fade > 0.01 && !state.failed) {
+      streaming = fade > 0.01 && !state.failed;
+      if (streaming) {
+        if (!since[city]) since[city] = time;
+        if (!ready[city] && state.ok && time - since[city] > 9) markReady(city);   // don't wait forever
         tiles.setResolutionFromRenderer(camera, renderer);
         tiles.update();
+        idle = state.ok && !tiles.isLoading ? idle + dt : 0;
+        if (idle > 0.6) markReady(city);
       }
+      const on = ready[city] && !state.failed;
+      reveal = on ? Math.min(1, reveal + dt / 0.9) : 0;
+      const ease = reveal * reveal * (3 - 2 * reveal);
+      uniforms.uFade.value = fade * ease;
+      // tiles keep loading while hidden; they are only drawn once this city is ready
+      tiles.group.visible = streaming && on;
+      world.realCities = on;
+      world.sky.uniforms.uDay.value = on ? fade * ease : 0;
       if (credit && time - creditAt > 1) {
         creditAt = time;
         const show = state.ok && fade > 0.2 && tiles.visibleTiles.size > 0;
@@ -154,7 +193,7 @@ export function createRealCities({ key, scene, camera, renderer, world }) {
       }
     },
     groundAt,
-    resize() { tiles.setResolutionFromRenderer(camera, renderer); },
+    resize() { setDetail(); tiles.setResolutionFromRenderer(camera, renderer); },
   };
 }
 

@@ -1118,18 +1118,14 @@ export const tiles = {
     varying vec2 vUv;
     varying vec3 vP;
     void main() {
+      // The photo already carries its own sunlight and shadows: no relighting (per-triangle
+      // shading made the photogrammetry mesh look shattered), only a gentle colour grade.
       vec3 c = texture2D(map, vUv).rgb;
       vec3 V = normalize(cameraPosition - vP);
-      vec3 N = normalize(cross(dFdx(vP), dFdy(vP)));
-      if (dot(N, V) < 0.0) N = -N;
       float lum = dot(c, vec3(0.2126, 0.7152, 0.0722));
       vec3 g = max(mix(vec3(lum), c, uSat), 0.0) * uExposure;
-      // low sun from the west: warm the faces that see it, cool the shade
-      vec2 sd = normalize(uSunDir.xz + 1e-5);
-      float west = max(dot(normalize(N.xz + 1e-5), sd), 0.0) * (1.0 - abs(N.y));
-      float lit = clamp(west * 0.9 + max(N.y, 0.0) * 0.35, 0.0, 1.0);
-      g *= mix(vec3(0.80, 0.87, 1.06), vec3(1.14, 0.97, 0.80), lit);
-      g = g / (1.0 + g * 0.35);                   // soften blown-out roofs and concrete
+      // late-afternoon split tone: shade a touch cooler, light a touch warmer
+      g *= mix(vec3(0.94, 0.97, 1.04), vec3(1.05, 1.0, 0.94), smoothstep(0.04, 0.5, lum));
       vec3 col = applyFog(g, vP);
       float d = length(vP.xz - uCenter.xz) / uRadius;
       vec3 haze = hazeColor(-V);
