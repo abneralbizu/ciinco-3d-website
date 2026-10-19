@@ -107,7 +107,8 @@ export function createRealCities({ key, scene, camera, renderer, world }) {
   const ready = { nyc: false, orl: false };
   const since = { nyc: 0, orl: 0 };
   let reveal = 0;      // 0..1 fade-in of the photographed city
-  let idle = 0;        // seconds the tile queue has been empty (one refinement wave can end before the next starts)
+  let hold = 0;        // seconds the view has been mostly loaded (one refinement wave can end before the next starts)
+  const loadedAt = { nyc: 0, orl: 0 };
   let lastT = 0;
   tiles.addEventListener('load-model', () => { state.loaded++; if (!state.failed) state.ok = true; });
   tiles.addEventListener('load-error', (e) => {
@@ -163,20 +164,23 @@ export function createRealCities({ key, scene, camera, renderer, world }) {
       const dn = camera.position.distanceTo(frames.nyc.center), dor = camera.position.distanceTo(frames.orl.center);
       const prev = city;
       useCity(dn < dor ? 'nyc' : 'orl');
-      if (city !== prev) { reveal = ready[city] ? 1 : 0; idle = 0; }
+      if (city !== prev) { reveal = ready[city] ? 1 : 0; hold = 0; }
       // photographed city from street level up to ~25 km, then the night map takes over
       const fade = 1 - Math.min(1, Math.max(0, (alt - 120) / 180));
       streaming = fade > 0.01 && !state.failed;
       if (streaming) {
-        if (!since[city]) since[city] = time;
+        if (!since[city]) { since[city] = time; loadedAt[city] = state.loaded; }
         // most of the view in (the last few far-off tiles can refine in place), or a long wait
         const waited = time - since[city];
-        if (!ready[city] && state.ok && waited > 1.5 && tiles.loadProgress > 0.88) markReady(city, 'progress');
-        if (!ready[city] && state.ok && waited > 20) markReady(city, 'timeout');
+        const st = tiles.stats;
+        const pending = st.queued + st.downloading + st.parsing;
+        const got = state.loaded - loadedAt[city];
+        const mostly = got >= 40 && pending <= 0.1 * (got + pending);
+        hold = state.ok && mostly ? hold + dt : 0;
+        if (!ready[city] && hold > 0.5) markReady(city, 'progress');
+        if (!ready[city] && state.ok && waited > 25) markReady(city, 'timeout');
         tiles.setResolutionFromRenderer(camera, renderer);
         tiles.update();
-        idle = state.ok && !tiles.isLoading ? idle + dt : 0;
-        if (idle > 0.6) markReady(city, 'idle');
       }
       const on = ready[city] && !state.failed;
       reveal = on ? Math.min(1, reveal + dt / 0.9) : 0;
