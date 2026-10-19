@@ -3,11 +3,10 @@
 // every frame (x east, y up, z south, metres), so numbers stay small and "up" is always +y.
 // Used only when a Google Maps key is configured; if Google fails, main.js falls back to the
 // drawn cities.
-import { Matrix4, Mesh, PerspectiveCamera, Scene, ShaderMaterial, SphereGeometry, Vector3 } from 'three';
+import { BackSide, Color, Matrix4, Mesh, PerspectiveCamera, Scene, ShaderMaterial, SphereGeometry, Vector3 } from 'three';
 import { DRACOLoader } from 'three/addons/loaders/DRACOLoader.js';
 import { TilesRenderer, WGS84_ELLIPSOID } from '3d-tiles-renderer';
 import { GoogleCloudAuthPlugin, GLTFExtensionsPlugin, TileCompressionPlugin } from '3d-tiles-renderer/plugins';
-import * as S from './shaders.js';
 
 const RAD = Math.PI / 180;
 // Keyframe altitudes are metres above the ground the drawn cities stood on; heights in the
@@ -18,7 +17,72 @@ const base = (lat) => {
   return -9.5 + (-32.6 + 9.5) * t;
 };
 
-export function createEarth({ key, renderer, sky, fog }) {
+// Daylight, as Google photographed it: a clear sky and aerial haze toward the horizon.
+// Colours are linear; the page renders this mode without tone mapping so the photos keep
+// their true colour.
+const SKY = {
+  vertexShader: /* glsl */ `
+    varying vec3 vDir;
+    void main() {
+      vDir = normalize(position);
+      vec4 p = projectionMatrix * viewMatrix * vec4(position + cameraPosition, 1.0);
+      gl_Position = p.xyww;
+    }
+  `,
+  fragmentShader: /* glsl */ `
+    uniform vec3 uHorizon;
+    uniform vec3 uZenith;
+    uniform vec3 uSun;
+    uniform float uSpace;
+    varying vec3 vDir;
+    void main() {
+      vec3 d = normalize(vDir);
+      float h = d.y;
+      vec3 col = mix(uHorizon, uZenith, pow(clamp(h, 0.0, 1.0), 0.45));
+      col = mix(col, uHorizon * 0.92, smoothstep(0.0, -0.08, h));
+      float s = max(dot(d, uSun), 0.0);
+      col += vec3(1.0, 0.92, 0.78) * (pow(s, 600.0) * 4.0 + pow(s, 12.0) * 0.12);
+      // from orbit: black space above a thin blue limb
+      vec3 space = mix(vec3(0.0, 0.0, 0.004), uHorizon * 0.5, exp(-max(h + 0.15, 0.0) * 12.0));
+      col = mix(col, space, uSpace);
+      gl_FragColor = vec4(col, 1.0);
+    }
+  `,
+};
+
+const TILE = {
+  vertexShader: /* glsl */ `
+    varying vec2 vUv;
+    varying vec3 vP;
+    void main() {
+      vUv = uv;
+      vec4 wp = modelMatrix * vec4(position, 1.0);
+      vP = wp.xyz;
+      gl_Position = projectionMatrix * viewMatrix * wp;
+    }
+  `,
+  fragmentShader: /* glsl */ `
+    uniform sampler2D map;
+    uniform float uFade;
+    uniform float uDensity;
+    uniform vec3 uHaze;
+    varying vec2 vUv;
+    varying vec3 vP;
+    void main() {
+      vec3 c = texture2D(map, vUv).rgb;
+      c = mix(c, c * c * (3.0 - 2.0 * c), 0.18);            // a little contrast back (aerial photos are flat)
+      float dist = length(vP - cameraPosition);
+      float f = 1.0 - exp(-dist * uDensity);
+      c = mix(c, uHaze, clamp(f, 0.0, 0.9));                 // aerial perspective
+      c = mix(uHaze, c, uFade);
+      gl_FragColor = vec4(c, 1.0);
+    }
+  `,
+};
+
+const lin = (hex) => new Color(hex);   // three converts sRGB hex to linear
+
+export function createEarth({ key, renderer }) {
   const scene = new Scene();
   const camera = new PerspectiveCamera(40, window.innerWidth / window.innerHeight, 1, 1e5);
 
@@ -39,19 +103,24 @@ export function createEarth({ key, renderer, sky, fog }) {
   tiles.group.matrixAutoUpdate = false;
   scene.add(tiles.group);
 
-  // the sky (shared with the drawn scene): photographed dusk sky, stars from high up
+  const sun = new Vector3(-0.55, 0.62, 0.56).normalize();
+  const horizon = lin('#cbd6e2'), zenith = lin('#5b86c4');
+  const sky = new ShaderMaterial({
+    ...SKY, side: BackSide, depthWrite: false,
+    uniforms: { uHorizon: { value: horizon }, uZenith: { value: zenith }, uSun: { value: sun }, uSpace: { value: 0 } },
+  });
   const skyMesh = new Mesh(new SphereGeometry(10, 48, 24), sky);
   skyMesh.renderOrder = -20;
   skyMesh.frustumCulled = false;
   scene.add(skyMesh);
 
-  const uniforms = { uFade: { value: 0 }, uExposure: { value: 0.86 }, uSat: { value: 0.96 }, ...S.fogUniforms(fog) };
+  const uniforms = { uFade: { value: 0 }, uDensity: { value: 1 / 30000 }, uHaze: { value: horizon.clone() } };
   tiles.addEventListener('load-model', ({ scene: model, tile }) => {
     model.traverse((o) => {
       if (!o.isMesh) return;
       const tex = o.material.map;
       if (tex) { tex.anisotropy = aniso; tex.needsUpdate = true; }
-      const m = new ShaderMaterial({ vertexShader: S.tiles.vertexShader, fragmentShader: S.tiles.fragmentShader, uniforms: { ...uniforms, map: { value: tex } } });
+      const m = new ShaderMaterial({ ...TILE, uniforms: { ...uniforms, map: { value: tex } } });
       tile.engineData.materials.push(m);
       o.material = m;
     });
@@ -112,8 +181,10 @@ export function createEarth({ key, renderer, sky, fog }) {
       const target = state.ready ? 1 : Math.min(0.7, 0.25 + 0.6 * (state.loaded / Math.max(1, state.loaded + pending)));
       reveal += (target - reveal) * Math.min(1, dt * (state.ready ? 1.6 : 0.8));
       uniforms.uFade.value = reveal * reveal * (3 - 2 * reveal);
-      // sky: golden hour near the ground, night and stars from orbit
-      sky.uniforms.uDay.value = 1 - Math.min(1, Math.max(0, (alt - 30000) / 370000));
+      // haze thins with height; from orbit the sky turns to space
+      const space = Math.min(1, Math.max(0, (alt - 40000) / 260000));
+      sky.uniforms.uSpace.value = space * space * (3 - 2 * space);
+      uniforms.uDensity.value = 1 / Math.max(30000, alt * 6);
 
       if (credit && time - creditAt > 1) {
         creditAt = time;

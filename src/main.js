@@ -1,6 +1,6 @@
 // CIIN Co. 3D: entry point.
 import {
-  ACESFilmicToneMapping, Clock, Color, ClampToEdgeWrapping, RepeatWrapping, HalfFloatType, LinearMipmapLinearFilter, LoadingManager, Matrix4,
+  ACESFilmicToneMapping, NoToneMapping, Clock, Color, ClampToEdgeWrapping, RepeatWrapping, HalfFloatType, LinearMipmapLinearFilter, LoadingManager, Matrix4,
   NoColorSpace, PerspectiveCamera, Ray, Scene, SRGBColorSpace, TextureLoader, Vector2, Vector3,
   WebGLRenderer, WebGLRenderTarget, Plane, Vector4,
 } from 'three';
@@ -171,8 +171,10 @@ async function boot() {
   const gkey = (document.querySelector('meta[name="gmaps-key"]')?.content || '').trim();
   let earth = null;
   if (gkey && !params.has('generated')) {
-    try { earth = createEarth({ key: gkey, renderer, sky: world.sky, fog: world.fog }); } catch (e) { console.warn('3D tiles unavailable', e); }
+    try { earth = createEarth({ key: gkey, renderer }); } catch (e) { console.warn('3D tiles unavailable', e); }
   }
+  // ?gcam=lat,lon,altM,lookLat,lookLon,lookAltM places the camera anywhere on the globe (tuning)
+  const gcam = params.has('gcam') ? params.get('gcam').split(',').map(Number) : null;
   const gframe = { pos: [0, 0, 0], look: [0, 0, 0], ox: 0, oy: 0, fov: 40, pull: 1, flight: 0 };
   let earthMode = null;   // switches the page between Google's Earth and the drawn cities
   // Night (generated cities) and golden hour (photographed cities) palettes for sky and haze.
@@ -339,6 +341,9 @@ async function boot() {
       bloom.enabled = !useEarth;
       final.uniforms.uGrain.value = useEarth ? 0.01 : 0.028;
       final.uniforms.uAberration.value = useEarth ? 0 : 0.0006;
+      final.uniforms.uVignette.value = useEarth ? 0.35 : 0.9;
+      // photographs keep their own colours: no filmic tone curve over them
+      renderer.toneMapping = useEarth ? NoToneMapping : ACESFilmicToneMapping;
       document.querySelectorAll('#labels .label').forEach((el) => el.classList.toggle('is-off', useEarth));
       worldHit = null;
       if (finePointer) cursor.classList.remove('is-world');
@@ -347,6 +352,7 @@ async function boot() {
     if (useEarth) {
       const ec = earth.camera;
       sampleJourneyGeo(pSmooth, aspect, gframe);
+      if (gcam) { gframe.pos = gcam.slice(0, 3); gframe.look = gcam.slice(3, 6); gframe.ox = 0; gframe.oy = 0; }
       if (intro < 1) gframe.pos[2] *= 1 + (1 - intro) * 0.35;
       earth.toFrame(gframe, frame.pos, frame.look);
       if (!reducedMotion.matches && finePointer) {
@@ -369,10 +375,7 @@ async function boot() {
       ec.setViewOffset(W(), H(), -gframe.ox * W(), gframe.oy * H(), W(), H());
       ec.updateProjectionMatrix();
       ec.updateMatrixWorld();
-      world.fog.density.value = 1 / Math.max(26000, altM * 5);
-      world.fog.detail.value = 1 - smooth(14000, 70000, altM);
       earth.update(altM, time);
-      applyPalette(world.sky.uniforms.uDay.value);
       composer.render(dt);
       if (time - lastUI > 0.1) {
         lastUI = time;
