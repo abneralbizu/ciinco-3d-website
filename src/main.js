@@ -1,7 +1,7 @@
 // CIIN Co. 3D: entry point.
 import {
   ACESFilmicToneMapping, NoToneMapping, Clock, Color, ClampToEdgeWrapping, RepeatWrapping, HalfFloatType, LinearMipmapLinearFilter, LoadingManager, Matrix4,
-  NoColorSpace, PerspectiveCamera, Ray, Scene, SRGBColorSpace, TextureLoader, Vector2, Vector3,
+  NoColorSpace, PerspectiveCamera, Ray, Scene, ShaderMaterial, SRGBColorSpace, TextureLoader, Vector2, Vector3,
   WebGLRenderer, WebGLRenderTarget, Plane, Vector4,
 } from 'three';
 import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
@@ -9,6 +9,7 @@ import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
 import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
 import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
 import { ShaderPass } from 'three/addons/postprocessing/ShaderPass.js';
+import { Pass, FullScreenQuad } from 'three/addons/postprocessing/Pass.js';
 import { buildWorld } from './world.js';
 import { createEarth } from './earth.js';
 import { sampleJourney, sampleJourneyGeo, CHAPTERS } from './journey.js';
@@ -63,6 +64,52 @@ function startScrollOnly() {
 }
 
 // ---------------------------------------------------------------------------
+// Crossfade between the drawn scene (in the composer's buffer, still HDR) and Google's Earth
+// (rendered here). The drawn scene gets its filmic tone curve here; the photographs don't.
+// ---------------------------------------------------------------------------
+class MixPass extends Pass {
+  constructor(samples) {
+    super();
+    this.rt = new WebGLRenderTarget(1, 1, { type: HalfFloatType, samples });
+    this.mix = 0;
+    this.scene = null; this.camera = null;
+    this.quad = new FullScreenQuad(new ShaderMaterial({
+      uniforms: { tWorld: { value: null }, tEarth: { value: null }, uMix: { value: 0 }, uExposure: { value: 1.05 } },
+      vertexShader: 'varying vec2 vUv; void main(){ vUv = uv; gl_Position = vec4(position.xy, 0.0, 1.0); }',
+      fragmentShader: `
+        uniform sampler2D tWorld; uniform sampler2D tEarth; uniform float uMix; uniform float uExposure; varying vec2 vUv;
+        vec3 RRTAndODTFit(vec3 v) { vec3 a = v * (v + 0.0245786) - 0.000090537; vec3 b = v * (0.983729 * v + 0.4329510) + 0.238081; return a / b; }
+        vec3 aces(vec3 c) {
+          const mat3 I = mat3(vec3(0.59719, 0.07600, 0.02840), vec3(0.35458, 0.90834, 0.13383), vec3(0.04823, 0.01566, 0.83777));
+          const mat3 O = mat3(vec3(1.60475, -0.10208, -0.00327), vec3(-0.53108, 1.10813, -0.07276), vec3(-0.07367, -0.00605, 1.07602));
+          c *= uExposure / 0.6; c = I * c; c = RRTAndODTFit(c); c = O * c; return clamp(c, 0.0, 1.0);
+        }
+        void main() {
+          vec3 w = uMix < 0.999 ? aces(texture2D(tWorld, vUv).rgb) : vec3(0.0);
+          vec3 e = uMix > 0.001 ? texture2D(tEarth, vUv).rgb : vec3(0.0);
+          gl_FragColor = vec4(mix(w, e, uMix), 1.0);
+        }`,
+      depthTest: false, depthWrite: false,
+    }));
+  }
+  setSize(w, h) { this.rt.setSize(w, h); }
+  render(renderer, writeBuffer, readBuffer) {
+    const u = this.quad.material.uniforms;
+    if (this.mix > 0.001) {
+      renderer.setRenderTarget(this.rt);
+      renderer.clear();
+      renderer.render(this.scene, this.camera);
+    }
+    u.tWorld.value = readBuffer.texture;
+    u.tEarth.value = this.rt.texture;
+    u.uMix.value = this.mix;
+    renderer.setRenderTarget(this.renderToScreen ? null : writeBuffer);
+    if (this.clear) renderer.clear();
+    this.quad.render(renderer);
+  }
+}
+
+// ---------------------------------------------------------------------------
 // Boot
 // ---------------------------------------------------------------------------
 async function boot() {
@@ -113,6 +160,10 @@ async function boot() {
   composer.addPass(new ShaderPass(sanitizePass));
   const bloom = new UnrealBloomPass(new Vector2(window.innerWidth, window.innerHeight), 0.42, 0.35, 1.05);
   composer.addPass(bloom);
+  const mixPass = new MixPass(quality.low ? 0 : 4);
+  mixPass.enabled = false;
+  composer.addPass(mixPass);
+  let bloomAllowed = true;
   composer.addPass(new OutputPass());
   const final = new ShaderPass(finalPass);
   composer.addPass(final);
@@ -176,6 +227,7 @@ async function boot() {
   // ?gcam=lat,lon,altM,lookLat,lookLon,lookAltM places the camera anywhere on the globe (tuning)
   const gcam = params.has('gcam') ? params.get('gcam').split(',').map(Number) : null;
   const gframe = { pos: [0, 0, 0], look: [0, 0, 0], ox: 0, oy: 0, fov: 40, pull: 1, flight: 0 };
+  const ePos = new Vector3(), eLook = new Vector3();
   let earthMode = null;   // switches the page between Google's Earth and the drawn cities
   // Night (generated cities) and golden hour (photographed cities) palettes for sky and haze.
   const palette = {
@@ -331,43 +383,52 @@ async function boot() {
       cursor.classList.toggle('is-hidden', !pointer.inside);
     }
 
-    // ---- Google's Earth: only the photographed globe and the sky ----
+    if (!reducedMotion.matches && finePointer) {
+      parallax.x += (pointer.x - parallax.x) * (1 - Math.exp(-dt * 2.5));
+      parallax.y += (pointer.y - parallax.y) * (1 - Math.exp(-dt * 2.5));
+    }
+
+    // ---- Our drawn opening (01) crossfades into Google's Earth on the way down ----
     const useEarth = !!earth && !earth.failed;
+    const mix = useEarth ? (gcam ? 1 : smooth(0.12, 0.62, pSmooth)) : 0;   // 0 drawn, 1 Google
+    const drawWorld = mix < 0.999, drawEarth = mix > 0.001;
     if (useEarth !== earthMode) {
       earthMode = useEarth;
-      document.body.classList.toggle('real-cities', useEarth);
-      renderPass.scene = useEarth ? earth.scene : scene;
-      renderPass.camera = useEarth ? earth.camera : camera;
-      bloom.enabled = !useEarth;
-      final.uniforms.uGrain.value = useEarth ? 0.01 : 0.028;
-      final.uniforms.uAberration.value = useEarth ? 0 : 0.0006;
-      final.uniforms.uVignette.value = useEarth ? 0.35 : 0.9;
-      // photographs keep their own colours: no filmic tone curve over them
+      // with Google in use the crossfade pass applies the filmic curve to the drawn scene only
       renderer.toneMapping = useEarth ? NoToneMapping : ACESFilmicToneMapping;
-      document.querySelectorAll('#labels .label').forEach((el) => el.classList.toggle('is-off', useEarth));
+      mixPass.enabled = useEarth;
+      if (useEarth) { mixPass.scene = earth.scene; mixPass.camera = earth.camera; }
+    }
+    const photo = mix > 0.5;
+    if (photo !== document.body.classList.contains('real-cities')) {
+      document.body.classList.toggle('real-cities', photo);
       worldHit = null;
       if (finePointer) cursor.classList.remove('is-world');
-      if (!useEarth) { world.sky.uniforms.uDay.value = 0; applyPalette(0); }
     }
+    final.uniforms.uGrain.value = 0.028 + (0.01 - 0.028) * mix;
+    final.uniforms.uAberration.value = 0.0006 * (1 - mix);
+    final.uniforms.uVignette.value = 0.9 + (0.35 - 0.9) * mix;
+    mixPass.mix = mix;
+    renderPass.enabled = drawWorld;
+    bloom.enabled = bloomAllowed && drawWorld;
+
+    let altM = 0;
     if (useEarth) {
+      // Google's camera always runs (so the globe is already loaded when the opening dissolves)
       const ec = earth.camera;
       sampleJourneyGeo(pSmooth, aspect, gframe);
       if (gcam) { gframe.pos = gcam.slice(0, 3); gframe.look = gcam.slice(3, 6); gframe.ox = 0; gframe.oy = 0; }
       if (intro < 1) gframe.pos[2] *= 1 + (1 - intro) * 0.35;
-      earth.toFrame(gframe, frame.pos, frame.look);
-      if (!reducedMotion.matches && finePointer) {
-        parallax.x += (pointer.x - parallax.x) * (1 - Math.exp(-dt * 2.5));
-        parallax.y += (pointer.y - parallax.y) * (1 - Math.exp(-dt * 2.5));
-      }
+      earth.toFrame(gframe, ePos, eLook);
       ec.up.set(0, 1, 0);
-      ec.position.copy(frame.pos);
-      ec.lookAt(frame.look);
-      const d = frame.pos.distanceTo(frame.look);
+      ec.position.copy(ePos);
+      ec.lookAt(eLook);
+      const d = ePos.distanceTo(eLook);
       tmp.set(1, 0, 0).applyQuaternion(ec.quaternion).multiplyScalar(parallax.x * d * 0.02);
       tmp2.set(0, 1, 0).applyQuaternion(ec.quaternion).multiplyScalar(parallax.y * d * 0.012);
       ec.position.add(tmp).add(tmp2);
-      ec.lookAt(frame.look);
-      const altM = Math.max(2, gframe.pos[2]);
+      ec.lookAt(eLook);
+      altM = Math.max(2, gframe.pos[2]);
       ec.fov = gframe.fov;
       // depth range: a few metres up close, out past the horizon from orbit
       ec.near = Math.max(1, altM * 0.04);
@@ -376,22 +437,10 @@ async function boot() {
       ec.updateProjectionMatrix();
       ec.updateMatrixWorld();
       earth.update(altM, time);
-      composer.render(dt);
-      if (time - lastUI > 0.1) {
-        lastUI = time;
-        bus.setProgress(p, Math.round(p), `${fmtLat(gframe.pos[0])} · ${fmtLon(gframe.pos[1])} · ALT ${fmtAlt(altM)}`);
-      }
-      if (started && perf.checked < 4 && !earth.busy) {
-        perf.frames++; perf.acc += dt;
-        if (perf.frames >= 90) {
-          const avg = perf.acc / perf.frames;
-          perf.frames = 0; perf.acc = 0; perf.checked++;
-          if (avg > 1 / 40 && dpr > 0.8) { dpr = Math.max(0.75, dpr - 0.35); resize(); }
-        }
-      }
-      return;
     }
 
+    let alt = 0;
+    if (drawWorld) {
     // camera
     sampleJourney(pSmooth, aspect, frame);
     if (debugCam) { frame.pos.copy(debugCam[0]); frame.look.copy(debugCam[1]); frame.ox = 0; frame.oy = 0; }
@@ -401,10 +450,6 @@ async function boot() {
       const back = 1 - intro;
       frame.pos.y *= 1 + back * 0.35;
     }
-    if (!reducedMotion.matches && finePointer) {
-      parallax.x += (pointer.x - parallax.x) * (1 - Math.exp(-dt * 2.5));
-      parallax.y += (pointer.y - parallax.y) * (1 - Math.exp(-dt * 2.5));
-    }
     camera.position.copy(frame.pos);
     camera.lookAt(frame.look);
     const dist = frame.pos.distanceTo(frame.look);
@@ -413,7 +458,7 @@ async function boot() {
     camera.position.add(tmp).add(tmp2);
     camera.position.y = Math.max(camera.position.y, 0.08);
     camera.lookAt(frame.look);
-    const alt = camera.position.y;
+    alt = camera.position.y;
     camera.fov = frame.fov;
     camera.near = Math.max(0.02, alt * 0.01);
     camera.far = Math.max(4000, alt * 60);
@@ -513,22 +558,28 @@ async function boot() {
     const reflOn = refl.on && alt < 60 && world.fog.detail.value > 0.05;
     world.reflect.uReflectOn.value = reflOn ? 1 : 0;
     if (reflOn) renderReflection(-frame.ox * W(), frame.oy * H());
+    }   // drawWorld
+
     composer.render(dt);
 
     if (time - lastUI > 0.1) {
       lastUI = time;
-      const ll = unproject(camera.position.x, camera.position.z);
-      bus.setProgress(p, Math.round(p), `${fmtLat(ll.lat)} · ${fmtLon(ll.lon)} · ALT ${fmtAlt(altitudeM(alt, ll.lat))}`);
+      if (photo) {
+        bus.setProgress(p, Math.round(p), `${fmtLat(gframe.pos[0])} · ${fmtLon(gframe.pos[1])} · ALT ${fmtAlt(altM)}`);
+      } else {
+        const ll = unproject(camera.position.x, camera.position.z);
+        bus.setProgress(p, Math.round(p), `${fmtLat(ll.lat)} · ${fmtLon(ll.lon)} · ALT ${fmtAlt(altitudeM(alt, ll.lat))}`);
+      }
     }
 
-    // (not while photographed tiles are streaming in: parsing them is a one-off cost, not the steady frame rate)
-    if (started && perf.checked < 4) {
+    // frame-time check (not while Google's tiles are streaming in: parsing them is a one-off cost)
+    if (started && perf.checked < 4 && !(photo && earth.busy)) {
       perf.frames++; perf.acc += dt;
       if (perf.frames >= 90) {
         const avg = perf.acc / perf.frames;
         perf.frames = 0; perf.acc = 0; perf.checked++;
         // too slow: first cheaper reflections, then none, then fewer pixels, then no glow
-        if (avg > 1 / 42 && refl.on && refl.scale > 0.3) { refl.scale = 0.25; sizeReflection(); } else if (avg > 1 / 42 && refl.on) { refl.on = false; } else if (avg > 1 / 42 && dpr > 0.8) { dpr = Math.max(0.75, dpr - 0.35); resize(); } else if (avg > 1 / 28 && bloom.enabled) bloom.enabled = false;
+        if (avg > 1 / 42 && refl.on && refl.scale > 0.3) { refl.scale = 0.25; sizeReflection(); } else if (avg > 1 / 42 && refl.on) { refl.on = false; } else if (avg > 1 / 42 && dpr > 0.8) { dpr = Math.max(0.75, dpr - 0.35); resize(); } else if (avg > 1 / 28 && bloomAllowed) bloomAllowed = false;
       }
     }
   }
