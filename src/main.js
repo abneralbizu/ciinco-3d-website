@@ -390,7 +390,10 @@ async function boot() {
 
     // ---- Our drawn opening (01) crossfades into Google's Earth on the way down ----
     const useEarth = !!earth && !earth.failed;
-    const mix = useEarth ? (gcam ? 1 : smooth(0.12, 0.62, pSmooth)) : 0;   // 0 drawn, 1 Google
+    // Google's Earth near the cities; our drawn night map for the opening and high up on the
+    // flight between them (Google's globe is coarse and blurry from that height)
+    let mix = useEarth ? (gcam ? 1 : smooth(0.12, 0.62, pSmooth)) : 0;   // 0 drawn, 1 Google
+    if (useEarth && !gcam) { sampleJourneyGeo(pSmooth, aspect, gframe); mix *= 1 - smooth(40000, 180000, gframe.pos[2]); }
     const drawWorld = mix < 0.999, drawEarth = mix > 0.001;
     if (useEarth !== earthMode) {
       earthMode = useEarth;

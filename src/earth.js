@@ -76,6 +76,7 @@ const TILE = {
     uniform vec3 uWater;
     uniform vec3 uSkyRefl;
     uniform float uSea;
+    uniform float uWaterOn;
     varying vec2 vUv;
     varying vec3 vP;
     void main() {
@@ -90,10 +91,11 @@ const TILE = {
       float blue = smoothstep(-0.01, 0.03, c.b - c.r);
       float water = smoothstep(4.0, 1.5, abs(seaY)) * smoothstep(0.985, 0.998, up) * blue;
       water = max(water, smoothstep(0.3, -0.6, seaY));             // anything below the surface (tile seams, skirts) is under water
+      water *= uWaterOn;                                            // only close up (coarse tiles from high up have no reliable height)
       vec3 V = normalize(cameraPosition - vP);
       float fres = pow(1.0 - clamp(V.y, 0.0, 1.0), 4.0);
       float lum = dot(c, vec3(0.2126, 0.7152, 0.0722));
-      vec3 sea = mix(uWater, uSkyRefl, fres * 0.45) * (0.85 + 0.3 * clamp(lum / 0.12, 0.4, 1.4));
+      vec3 sea = mix(uWater, uSkyRefl, fres * 0.55) * (0.88 + 0.24 * clamp(lum / 0.12, 0.4, 1.4));
       c = mix(c, sea, water);
       // late-afternoon grade to sit with the site's dark palette: a touch darker and warmer,
       // shadows cooler, and the contrast aerial photographs lose
@@ -145,7 +147,7 @@ export function createEarth({ key, renderer }) {
 
   const uniforms = {
     uFade: { value: 0 }, uDensity: { value: 1 / 55000 }, uHaze: { value: horizon.clone().multiplyScalar(0.85) },
-    uWater: { value: lin('#1b3346') }, uSkyRefl: { value: lin('#7d8aa3') }, uSea: { value: 0 },
+    uWater: { value: lin('#1f6185') }, uSkyRefl: { value: lin('#8fb8d6') }, uSea: { value: 0 }, uWaterOn: { value: 1 },
   };
   tiles.addEventListener('load-model', ({ scene: model, tile }) => {
     model.traverse((o) => {
@@ -218,6 +220,7 @@ export function createEarth({ key, renderer }) {
       const space = Math.min(1, Math.max(0, (alt - 40000) / 260000));
       sky.uniforms.uSpace.value = space * space * (3 - 2 * space);
       uniforms.uDensity.value = 1 / Math.max(55000, alt * 9);
+      uniforms.uWaterOn.value = 1 - Math.min(1, Math.max(0, (alt - 3000) / 5000));
 
       if (credit && time - creditAt > 1) {
         creditAt = time;
