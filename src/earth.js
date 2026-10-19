@@ -12,6 +12,8 @@ const RAD = Math.PI / 180;
 // Keyframe altitudes are metres above the ground the drawn cities stood on; heights in the
 // tiles are above the WGS84 ellipsoid (the geoid is ~33 m below it in New York, ~29 m in Orlando,
 // where the ground is ~20 m above sea level).
+// Mean sea level above the ellipsoid (geoid height): about -32.6 m in New York, -29 m in Orlando.
+const geoid = (lat) => -29.0 + (-32.6 + 29.0) * Math.min(1, Math.max(0, (lat - 28.5) / (40.7 - 28.5)));
 const base = (lat) => {
   const t = Math.min(1, Math.max(0, (lat - 28.5) / (40.7 - 28.5)));
   return -9.5 + (-32.6 + 9.5) * t;
@@ -73,6 +75,7 @@ const TILE = {
     uniform vec3 uHaze;
     uniform vec3 uWater;
     uniform vec3 uSkyRefl;
+    uniform float uSea;
     varying vec2 vUv;
     varying vec3 vP;
     void main() {
@@ -83,7 +86,7 @@ const TILE = {
       // and buildings stand above sea level and keep their photographs.)
       vec3 N = normalize(cross(dFdx(vP), dFdy(vP)));
       float up = abs(N.y);
-      float seaY = vP.y + dot(vP.xz, vP.xz) / (2.0 * 6371000.0);   // height above sea level (Earth's curve removed)
+      float seaY = vP.y + dot(vP.xz, vP.xz) / (2.0 * 6371000.0) - uSea;   // height above sea level (Earth's curve removed)
       float blue = smoothstep(-0.01, 0.03, c.b - c.r);
       float water = smoothstep(4.0, 1.5, abs(seaY)) * smoothstep(0.985, 0.998, up) * blue;
       water = max(water, smoothstep(0.3, -0.6, seaY));             // anything below the surface (tile seams, skirts) is under water
@@ -142,7 +145,7 @@ export function createEarth({ key, renderer }) {
 
   const uniforms = {
     uFade: { value: 0 }, uDensity: { value: 1 / 55000 }, uHaze: { value: horizon.clone().multiplyScalar(0.85) },
-    uWater: { value: lin('#1b3346') }, uSkyRefl: { value: lin('#7d8aa3') },
+    uWater: { value: lin('#1b3346') }, uSkyRefl: { value: lin('#7d8aa3') }, uSea: { value: 0 },
   };
   tiles.addEventListener('load-model', ({ scene: model, tile }) => {
     model.traverse((o) => {
@@ -173,6 +176,7 @@ export function createEarth({ key, renderer }) {
     WGS84_ELLIPSOID.getEastNorthUpFrame(lat * RAD, lon * RAD, base(lat), enu);
     toLocal.copy(axes).multiply(enu.invert());
     tiles.group.matrix.copy(toLocal);
+    uniforms.uSea.value = geoid(lat) - base(lat);   // sea level in this frame (inland, well below the ground)
     tiles.group.updateMatrixWorld();   // also refreshes the inverse the tiles renderer uses
     WGS84_ELLIPSOID.getCartographicToPosition(g.pos[0] * RAD, g.pos[1] * RAD, g.pos[2] + base(g.pos[0]), v);
     outPos.copy(v.applyMatrix4(toLocal));
