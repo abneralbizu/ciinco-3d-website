@@ -10,8 +10,8 @@ import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js'
 import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
 import { ShaderPass } from 'three/addons/postprocessing/ShaderPass.js';
 import { buildWorld } from './world.js';
-import { createRealCities } from './realcity.js';
-import { sampleJourney, CHAPTERS } from './journey.js';
+import { createEarth } from './earth.js';
+import { sampleJourney, sampleJourneyGeo, CHAPTERS } from './journey.js';
 import { unproject, altitudeM, P } from './geo.js';
 import { initUI, setLoader, finishLoading, reducedMotion } from './ui.js';
 import { finalPass, sanitizePass } from './shaders.js';
@@ -108,7 +108,8 @@ async function boot() {
   const composer = new EffectComposer(renderer, rt);
   composer.setPixelRatio(dpr);
   composer.setSize(window.innerWidth, window.innerHeight);
-  composer.addPass(new RenderPass(scene, camera));
+  const renderPass = new RenderPass(scene, camera);
+  composer.addPass(renderPass);
   composer.addPass(new ShaderPass(sanitizePass));
   const bloom = new UnrealBloomPass(new Vector2(window.innerWidth, window.innerHeight), 0.42, 0.35, 1.05);
   composer.addPass(bloom);
@@ -165,12 +166,15 @@ async function boot() {
     world.waterMeshes.forEach((w, i) => { w.visible = was[i]; });
   }
 
-  // ---- Photographed cities (when a Google Maps key is configured) ----------------
+  // ---- Photographed Earth (when a Google Maps key is configured) ------------------
+  // Only Google's 3D tiles and the sky; the drawn cities are the fallback if Google fails.
   const gkey = (document.querySelector('meta[name="gmaps-key"]')?.content || '').trim();
-  let real = null;
+  let earth = null;
   if (gkey && !params.has('generated')) {
-    try { real = createRealCities({ key: gkey, scene, camera, renderer, world }); } catch (e) { console.warn('3D tiles unavailable', e); }
+    try { earth = createEarth({ key: gkey, renderer, sky: world.sky, fog: world.fog }); } catch (e) { console.warn('3D tiles unavailable', e); }
   }
+  const gframe = { pos: [0, 0, 0], look: [0, 0, 0], ox: 0, oy: 0, fov: 40, pull: 1, flight: 0 };
+  let earthMode = null;   // switches the page between Google's Earth and the drawn cities
   // Night (generated cities) and golden hour (photographed cities) palettes for sky and haze.
   const palette = {
     night: { zenith: world.uZenith.value.clone(), horizon: world.sky.uniforms.uHorizon.value.clone(), glow: world.sky.uniforms.uGlow.value.clone(), cool: world.fog.cool.value.clone(), warm: world.fog.warm.value.clone() },
@@ -183,7 +187,6 @@ async function boot() {
     world.fog.cool.value.copy(palette.night.cool).lerp(palette.day.cool, t);
     world.fog.warm.value.copy(palette.night.warm).lerp(palette.day.warm, t);
   }
-  let groundCheckAt = 0;
 
   // ---- Labels ----------------------------------------------------------------
   const labelRoot = document.getElementById('labels');
@@ -241,7 +244,7 @@ async function boot() {
     composer.setSize(w, h);
     world.uPixelRatio.value = dpr;
     sizeReflection();
-    if (real) real.resize();
+    if (earth) earth.resize();
     computeAnchors();
   }
   window.addEventListener('resize', resize);
@@ -308,9 +311,6 @@ async function boot() {
     const time = clock.elapsedTime;
     world.uTime.value = time;
     final.uniforms.uTime.value = reducedMotion.matches ? 0 : time;
-    // film grain and lens fringing suit the night map, not photographs
-    final.uniforms.uGrain.value = world.realCities ? 0.01 : 0.028;
-    final.uniforms.uAberration.value = world.realCities ? 0 : 0.0006;
 
     p = progressFromScroll();
     const snap = pinnedP !== null;
@@ -321,8 +321,75 @@ async function boot() {
     if (started && introT < 1) introT = Math.min(1, introT + dt / 4.5);
     const intro = 1 - Math.pow(1 - introT, 3);
 
-    // camera
     const aspect = W() / H();
+    if (finePointer) {
+      pointer.sx += (pointer.px - pointer.sx) * 0.25;
+      pointer.sy += (pointer.py - pointer.sy) * 0.25;
+      cursor.style.transform = `translate3d(${pointer.sx.toFixed(1)}px, ${pointer.sy.toFixed(1)}px, 0)`;
+      cursor.classList.toggle('is-hidden', !pointer.inside);
+    }
+
+    // ---- Google's Earth: only the photographed globe and the sky ----
+    const useEarth = !!earth && !earth.failed;
+    if (useEarth !== earthMode) {
+      earthMode = useEarth;
+      document.body.classList.toggle('real-cities', useEarth);
+      renderPass.scene = useEarth ? earth.scene : scene;
+      renderPass.camera = useEarth ? earth.camera : camera;
+      bloom.enabled = !useEarth;
+      final.uniforms.uGrain.value = useEarth ? 0.01 : 0.028;
+      final.uniforms.uAberration.value = useEarth ? 0 : 0.0006;
+      document.querySelectorAll('#labels .label').forEach((el) => el.classList.toggle('is-off', useEarth));
+      worldHit = null;
+      if (finePointer) cursor.classList.remove('is-world');
+      if (!useEarth) { world.sky.uniforms.uDay.value = 0; applyPalette(0); }
+    }
+    if (useEarth) {
+      const ec = earth.camera;
+      sampleJourneyGeo(pSmooth, aspect, gframe);
+      if (intro < 1) gframe.pos[2] *= 1 + (1 - intro) * 0.35;
+      earth.toFrame(gframe, frame.pos, frame.look);
+      if (!reducedMotion.matches && finePointer) {
+        parallax.x += (pointer.x - parallax.x) * (1 - Math.exp(-dt * 2.5));
+        parallax.y += (pointer.y - parallax.y) * (1 - Math.exp(-dt * 2.5));
+      }
+      ec.up.set(0, 1, 0);
+      ec.position.copy(frame.pos);
+      ec.lookAt(frame.look);
+      const d = frame.pos.distanceTo(frame.look);
+      tmp.set(1, 0, 0).applyQuaternion(ec.quaternion).multiplyScalar(parallax.x * d * 0.02);
+      tmp2.set(0, 1, 0).applyQuaternion(ec.quaternion).multiplyScalar(parallax.y * d * 0.012);
+      ec.position.add(tmp).add(tmp2);
+      ec.lookAt(frame.look);
+      const altM = Math.max(2, gframe.pos[2]);
+      ec.fov = gframe.fov;
+      // depth range: a few metres up close, out past the horizon from orbit
+      ec.near = Math.max(1, altM * 0.04);
+      ec.far = Math.max(60000, 2.2 * Math.sqrt(2 * 6371000 * altM + altM * altM));
+      ec.setViewOffset(W(), H(), -gframe.ox * W(), gframe.oy * H(), W(), H());
+      ec.updateProjectionMatrix();
+      ec.updateMatrixWorld();
+      world.fog.density.value = 1 / Math.max(26000, altM * 5);
+      world.fog.detail.value = 1 - smooth(14000, 70000, altM);
+      earth.update(altM, time);
+      applyPalette(world.sky.uniforms.uDay.value);
+      composer.render(dt);
+      if (time - lastUI > 0.1) {
+        lastUI = time;
+        bus.setProgress(p, Math.round(p), `${fmtLat(gframe.pos[0])} · ${fmtLon(gframe.pos[1])} · ALT ${fmtAlt(altM)}`);
+      }
+      if (started && perf.checked < 4 && !earth.busy) {
+        perf.frames++; perf.acc += dt;
+        if (perf.frames >= 90) {
+          const avg = perf.acc / perf.frames;
+          perf.frames = 0; perf.acc = 0; perf.checked++;
+          if (avg > 1 / 40 && dpr > 0.8) { dpr = Math.max(0.75, dpr - 0.35); resize(); }
+        }
+      }
+      return;
+    }
+
+    // camera
     sampleJourney(pSmooth, aspect, frame);
     if (debugCam) { frame.pos.copy(debugCam[0]); frame.look.copy(debugCam[1]); frame.ox = 0; frame.oy = 0; }
     if (intro < 1) {
@@ -439,27 +506,8 @@ async function boot() {
       if (worldHit && cursorLabel.textContent !== worldHit.label) cursorLabel.textContent = worldHit.label;
     }
 
-    // photographed cities: stream tiles for this view, blend the palette, stand the beams on the ground
-    if (real) {
-      real.update(alt, time);
-      applyPalette(world.sky.uniforms.uDay.value);
-      if (real.active && time - groundCheckAt > 1) {
-        groundCheckAt = time;
-        world.offices.forEach((o) => {
-          const y = real.groundAt(o.pos.x, o.pos.z);
-          if (y !== null) { o.ring.position.y = y + 0.02; o.beam.position.y = y; }
-        });
-      }
-    }
-    // drawn extras (glowing advisory tower, parcel grid) give way to the photographed cities
-    if (world.tower.mesh.visible === !!world.realCities) {
-      world.tower.mesh.visible = !world.realCities;
-      world.parcelLines.visible = !world.realCities;
-      document.body.classList.toggle('real-cities', !!world.realCities);
-    }
-    // reflections only matter near the ground (and, with photographed cities, only on New York's water)
-    const nearNYC = camera.position.distanceTo(world.nyc.center) < 400;
-    const reflOn = refl.on && alt < 60 && world.fog.detail.value > 0.05 && (!world.realCities || nearNYC);
+    // reflections only matter near the ground
+    const reflOn = refl.on && alt < 60 && world.fog.detail.value > 0.05;
     world.reflect.uReflectOn.value = reflOn ? 1 : 0;
     if (reflOn) renderReflection(-frame.ox * W(), frame.oy * H());
     composer.render(dt);
@@ -471,7 +519,7 @@ async function boot() {
     }
 
     // (not while photographed tiles are streaming in: parsing them is a one-off cost, not the steady frame rate)
-    if (started && perf.checked < 4 && !(real && real.busy)) {
+    if (started && perf.checked < 4) {
       perf.frames++; perf.acc += dt;
       if (perf.frames >= 90) {
         const avg = perf.acc / perf.frames;

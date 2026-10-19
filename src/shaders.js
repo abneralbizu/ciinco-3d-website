@@ -1110,8 +1110,6 @@ export const tiles = {
   fragmentShader: /* glsl */ `
     uniform sampler2D map;
     uniform float uFade;
-    uniform vec3 uCenter;
-    uniform float uRadius;
     uniform float uExposure;
     uniform float uSat;
     ${FOG}
@@ -1127,10 +1125,7 @@ export const tiles = {
       // late-afternoon split tone: shade a touch cooler, light a touch warmer
       g *= mix(vec3(0.94, 0.97, 1.04), vec3(1.05, 1.0, 0.94), smoothstep(0.04, 0.5, lum));
       vec3 col = applyFog(g, vP);
-      float d = length(vP.xz - uCenter.xz) / uRadius;
-      vec3 haze = hazeColor(-V);
-      col = mix(col, haze, smoothstep(0.72, 1.0, d));
-      col = mix(haze, col, uFade);
+      col = mix(hazeColor(-V), col, uFade);
       gl_FragColor = vec4(col, 1.0);
     }
   `,

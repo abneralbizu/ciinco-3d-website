@@ -518,3 +518,6 @@ main { position: relative; z-index: 2; overflow-x: clip; }
 
 /* Photographed cities: hide hints that refer to the drawn 3D extras. */
 body.real-cities .gen-only { display: none; }
+
+/* Photographed Earth: no drawn labels over the photographs */
+body.real-cities #labels { display: none; }

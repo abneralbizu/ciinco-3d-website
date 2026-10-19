@@ -64,3 +64,48 @@ export function sampleJourney(p, aspect, out) {
 }
 
 export const CHAPTERS = N;
+
+// ---------------------------------------------------------------------------
+// The same flight plan on the real globe (photographed mode): positions as latitude,
+// longitude and height in metres, so the camera can fly over Google's Earth directly.
+// ---------------------------------------------------------------------------
+const M_LAT = 110574;
+const mPerLon = (lat) => 111320 * Math.cos(lat * Math.PI / 180);
+
+export function sampleJourneyGeo(p, aspect, out) {
+  const i = Math.min(N - 2, Math.max(0, Math.floor(p)));
+  const f = Math.min(1, Math.max(0, p - i));
+  const e = ease(f);
+  const A = KEYFRAMES[i], B = KEYFRAMES[i + 1];
+
+  const hA = Math.max(5, A.pos[2]), hB = Math.max(5, B.pos[2]);
+  const midLat = (A.pos[0] + B.pos[0]) / 2;
+  const D = Math.hypot((B.pos[1] - A.pos[1]) * mPerLon(midLat), (B.pos[0] - A.pos[0]) * M_LAT);
+  const peak = Math.max(hA, hB, D * 0.75);
+  const far = peak > Math.max(hA, hB) * 1.6;
+  const bump = far ? Math.pow(Math.sin(Math.PI * e), 0.8) : 0;
+  const logH = lerp(Math.log(hA), Math.log(hB), e);
+  const h = Math.exp(logH + (Math.log(peak) - logH) * bump);
+  const ratio = Math.max(hA, hB) / Math.min(hA, hB);
+  const hf = far ? ease(ease(e)) : ratio > 8 ? (h - hA) / (hB - hA) : e;
+  const lat = lerp(A.pos[0], B.pos[0], hf), lon = lerp(A.pos[1], B.pos[1], hf);
+  out.pos[0] = lat; out.pos[1] = lon; out.pos[2] = h;
+
+  let lLat = lerp(A.look[0], B.look[0], hf), lLon = lerp(A.look[1], B.look[1], hf), lH = lerp(A.look[2], B.look[2], hf);
+  if (far) {
+    // high up on a flight: look at the ground a little ahead instead
+    const dx = (lLon - lon) * mPerLon(lat), dy = (lLat - lat) * M_LAT;
+    const len = Math.hypot(dx, dy) || 1;
+    const gLat = lat + (dy / len) * h * 0.35 / M_LAT, gLon = lon + (dx / len) * h * 0.35 / mPerLon(lat);
+    lLat = lerp(lLat, gLat, bump); lLon = lerp(lLon, gLon, bump); lH = lerp(lH, 0, bump);
+  }
+  out.look[0] = lLat; out.look[1] = lLon; out.look[2] = lH;
+
+  const narrow = aspect < 0.9;
+  out.ox = narrow ? 0 : lerp(A.ox, B.ox, e);
+  out.oy = narrow ? lerp(A.my, B.my, e) : lerp(A.oy, B.oy, e);
+  out.fov = lerp(A.fov, B.fov, e);
+  out.pull = narrow ? lerp(A.mob, B.mob, e) * (1 + (0.9 / aspect - 1) * 0.3) : 1;
+  out.flight = bump;
+  return out;
+}
