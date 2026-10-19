@@ -100,9 +100,9 @@ export function createRealCities({ key, scene, camera, renderer, world }) {
     });
   });
 
-  // A city switches from the drawn version to the photographed one only once the tiles for
-  // the current view have finished streaming (or after a few seconds, whatever has arrived),
-  // then fades in, so nobody sees an empty harbour or half-loaded shards.
+  // The drawn cities never show while Google's are in use (only if Google fails to load).
+  // A photographed view emerges out of the haze as its tiles stream in, and is fully clear
+  // once most of them have arrived.
   const state = { ok: false, failed: false, loaded: 0 };
   const ready = { nyc: false, orl: false };
   const since = { nyc: 0, orl: 0 };
@@ -112,16 +112,15 @@ export function createRealCities({ key, scene, camera, renderer, world }) {
   let lastT = 0;
   tiles.addEventListener('load-model', () => { state.loaded++; if (!state.failed) state.ok = true; });
   tiles.addEventListener('load-error', (e) => {
-    if (!state.ok && (e.tile == null || e.tile === tiles.root)) { state.failed = true; setGenerated('nyc', true); setGenerated('orl', true); }
+    if (!state.ok && (e.tile == null || e.tile === tiles.root)) { state.failed = true; setGenerated('nyc', true); setGenerated('orl', true); world.realCities = false; }
     console.warn('3D tiles:', e.error || e);
   });
   let streaming = false;
   const debug = new URLSearchParams(location.search).has('debug');
   function markReady(id, why) {
     if (ready[id]) return;
-    if (debug) console.info('city ready', id, why, { loaded: state.loaded, t: performance.now() | 0, visible: tiles.visibleTiles.size, stats: { ...tiles.stats } });
     ready[id] = true;
-    setGenerated(id, false);
+    if (debug) console.info('city ready', id, why, { loaded: state.loaded, t: performance.now() | 0, visible: tiles.visibleTiles.size, stats: { ...tiles.stats } });
   }
 
   // Hide one drawn city (but keep the advisory tower, the parcel overlay and the harbour water).
@@ -133,6 +132,10 @@ export function createRealCities({ key, scene, camera, renderer, world }) {
       world.reflect.uMirrorY.value = on ? 0 : 0.5 * frames.nyc.upm;
     }
   }
+
+  setGenerated('nyc', false);
+  setGenerated('orl', false);
+  world.realCities = true;
 
   // Ground height under a point (for the office beams), from the loaded tiles.
   const ray = new Raycaster();
@@ -154,7 +157,7 @@ export function createRealCities({ key, scene, camera, renderer, world }) {
   if (debug) window.__real = { tiles, ready, state };
   return {
     tiles,
-    get active() { return state.ok && !state.failed && !!ready[city]; },
+    get active() { return state.ok && !state.failed; },
     /** True while the current view is still streaming (frame-time checks should wait). */
     get busy() { return streaming && !ready[city]; },
     update(alt, time) {
@@ -182,14 +185,17 @@ export function createRealCities({ key, scene, camera, renderer, world }) {
         tiles.setResolutionFromRenderer(camera, renderer);
         tiles.update();
       }
-      const on = ready[city] && !state.failed;
-      reveal = on ? Math.min(1, reveal + dt / 0.9) : 0;
+      // clearness follows how much of the view has arrived (mist while loading, clear when ready)
+      const st2 = tiles.stats;
+      const pend = st2.queued + st2.downloading + st2.parsing;
+      const got2 = Math.max(0, state.loaded - loadedAt[city]);
+      const target = state.failed ? 0 : ready[city] ? 1 : Math.min(0.7, 0.25 + 0.6 * (got2 / Math.max(1, got2 + pend)));
+      reveal += (target - reveal) * Math.min(1, dt * (ready[city] ? 1.6 : 0.8));
       const ease = reveal * reveal * (3 - 2 * reveal);
       uniforms.uFade.value = fade * ease;
-      // tiles keep loading while hidden; they are only drawn once this city is ready
-      tiles.group.visible = streaming && on;
-      world.realCities = on;
-      world.sky.uniforms.uDay.value = on ? fade * ease : 0;
+      tiles.group.visible = streaming;
+      world.realCities = !state.failed;
+      world.sky.uniforms.uDay.value = state.failed ? 0 : fade;
       if (credit && time - creditAt > 1) {
         creditAt = time;
         const show = state.ok && fade > 0.2 && tiles.visibleTiles.size > 0;
