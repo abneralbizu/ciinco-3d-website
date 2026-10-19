@@ -14,8 +14,8 @@ const RAD = Math.PI / 180;
 // origin sits at local mean sea level in New York (the geoid is ~32.6 m below the ellipsoid
 // there) and about 20 m above sea level in Orlando, where the generated city's ground was.
 const CITIES = {
-  nyc: { lat: 40.72, lon: -73.99, h: -32.6, radiusM: 16000 },
-  orl: { lat: 28.60, lon: -81.32, h: -9.5, radiusM: 30000 },
+  nyc: { lat: 40.72, lon: -73.99, h: -32.6, radiusM: 11000 },
+  orl: { lat: 28.60, lon: -81.32, h: -9.5, radiusM: 22000 },
 };
 
 /** Scene matrix for a city: ECEF metres -> east/north/up -> scene units (x east, y up, z south). */
@@ -169,7 +169,10 @@ export function createRealCities({ key, scene, camera, renderer, world }) {
       streaming = fade > 0.01 && !state.failed;
       if (streaming) {
         if (!since[city]) since[city] = time;
-        if (!ready[city] && state.ok && time - since[city] > 9) markReady(city, 'timeout');   // don't wait forever
+        // most of the view in (the last few far-off tiles can refine in place), or a long wait
+        const waited = time - since[city];
+        if (!ready[city] && state.ok && waited > 1.5 && tiles.loadProgress > 0.88) markReady(city, 'progress');
+        if (!ready[city] && state.ok && waited > 20) markReady(city, 'timeout');
         tiles.setResolutionFromRenderer(camera, renderer);
         tiles.update();
         idle = state.ok && !tiles.isLoading ? idle + dt : 0;
