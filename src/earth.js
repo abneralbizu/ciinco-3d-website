@@ -91,6 +91,10 @@ const TILE = {
       float blue = smoothstep(-0.01, 0.03, c.b - c.r);
       float water = smoothstep(4.0, 1.5, abs(seaY)) * smoothstep(0.985, 0.998, up) * blue;
       water = max(water, smoothstep(0.3, -0.6, seaY));             // anything below the surface (tile seams, skirts) is under water
+      // inland lakes (Orlando): flat, dark and bluish in Google's photos, at any height
+      float lum0 = dot(c, vec3(0.2126, 0.7152, 0.0722));
+      float lake = smoothstep(0.990, 0.998, up) * smoothstep(0.008, 0.025, c.b - c.r) * smoothstep(0.11, 0.05, lum0);
+      water = max(water, lake);
       water *= uWaterOn;                                            // only close up (coarse tiles from high up have no reliable height)
       vec3 V = normalize(cameraPosition - vP);
       float fres = pow(1.0 - clamp(V.y, 0.0, 1.0), 4.0);
