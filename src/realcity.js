@@ -115,8 +115,10 @@ export function createRealCities({ key, scene, camera, renderer, world }) {
     console.warn('3D tiles:', e.error || e);
   });
   let streaming = false;
-  function markReady(id) {
+  const debug = new URLSearchParams(location.search).has('debug');
+  function markReady(id, why) {
     if (ready[id]) return;
+    if (debug) console.info('city ready', id, why, { loaded: state.loaded, t: performance.now() | 0, visible: tiles.visibleTiles.size, stats: { ...tiles.stats } });
     ready[id] = true;
     setGenerated(id, false);
   }
@@ -148,6 +150,7 @@ export function createRealCities({ key, scene, camera, renderer, world }) {
   let creditAt = 0;
   const attributions = [];
 
+  if (debug) window.__real = { tiles, ready, state };
   return {
     tiles,
     get active() { return state.ok && !state.failed && !!ready[city]; },
@@ -166,11 +169,11 @@ export function createRealCities({ key, scene, camera, renderer, world }) {
       streaming = fade > 0.01 && !state.failed;
       if (streaming) {
         if (!since[city]) since[city] = time;
-        if (!ready[city] && state.ok && time - since[city] > 9) markReady(city);   // don't wait forever
+        if (!ready[city] && state.ok && time - since[city] > 9) markReady(city, 'timeout');   // don't wait forever
         tiles.setResolutionFromRenderer(camera, renderer);
         tiles.update();
         idle = state.ok && !tiles.isLoading ? idle + dt : 0;
-        if (idle > 0.6) markReady(city);
+        if (idle > 0.6) markReady(city, 'idle');
       }
       const on = ready[city] && !state.failed;
       reveal = on ? Math.min(1, reveal + dt / 0.9) : 0;
