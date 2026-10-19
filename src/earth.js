@@ -33,15 +33,20 @@ const SKY = {
     uniform vec3 uHorizon;
     uniform vec3 uZenith;
     uniform vec3 uSun;
+    uniform vec3 uGlow;
     uniform float uSpace;
     varying vec3 vDir;
     void main() {
       vec3 d = normalize(vDir);
       float h = d.y;
-      vec3 col = mix(uHorizon, uZenith, pow(clamp(h, 0.0, 1.0), 0.45));
-      col = mix(col, uHorizon * 0.92, smoothstep(0.0, -0.08, h));
+      vec3 col = mix(uHorizon, uZenith, pow(clamp(h, 0.0, 1.0), 0.5));
+      col = mix(col, uHorizon * 0.8, smoothstep(0.0, -0.08, h));
+      // golden hour: a warm band along the horizon, strongest toward the low sun
+      vec2 a = normalize(d.xz + 1e-5), b = normalize(uSun.xz + 1e-5);
+      float toward = max(dot(a, b), 0.0);
+      col += uGlow * exp(-max(h, 0.0) * 7.0) * (0.25 + 0.9 * pow(toward, 3.0));
       float s = max(dot(d, uSun), 0.0);
-      col += vec3(1.0, 0.92, 0.78) * (pow(s, 600.0) * 4.0 + pow(s, 12.0) * 0.12);
+      col += vec3(1.0, 0.8, 0.55) * (pow(s, 800.0) * 3.0 + pow(s, 16.0) * 0.15);
       // from orbit: black space above a thin blue limb
       vec3 space = mix(vec3(0.0, 0.0, 0.004), uHorizon * 0.5, exp(-max(h + 0.15, 0.0) * 12.0));
       col = mix(col, space, uSpace);
@@ -85,12 +90,16 @@ const TILE = {
       vec3 V = normalize(cameraPosition - vP);
       float fres = pow(1.0 - clamp(V.y, 0.0, 1.0), 4.0);
       float lum = dot(c, vec3(0.2126, 0.7152, 0.0722));
-      vec3 sea = mix(uWater, uSkyRefl, fres * 0.75) * (0.9 + 0.2 * clamp(lum / 0.12, 0.5, 1.5) - 0.1);
+      vec3 sea = mix(uWater, uSkyRefl, fres * 0.45) * (0.85 + 0.3 * clamp(lum / 0.12, 0.4, 1.4));
       c = mix(c, sea, water);
-      c = mix(c, c * c * (3.0 - 2.0 * c), 0.18);            // a little contrast back (aerial photos are flat)
+      // late-afternoon grade to sit with the site's dark palette: a touch darker and warmer,
+      // shadows cooler, and the contrast aerial photographs lose
+      float l2 = dot(c, vec3(0.2126, 0.7152, 0.0722));
+      c *= mix(vec3(0.86, 0.9, 1.0), vec3(1.06, 0.97, 0.86), smoothstep(0.02, 0.35, l2)) * 0.9;
+      c = mix(c, c * c * (3.0 - 2.0 * c), 0.35);
       float dist = length(vP - cameraPosition);
       float f = 1.0 - exp(-dist * uDensity);
-      c = mix(c, uHaze, clamp(f, 0.0, 0.9));                 // aerial perspective
+      c = mix(c, uHaze, clamp(f, 0.0, 0.75));                // aerial perspective
       c = mix(uHaze, c, uFade);
       gl_FragColor = vec4(c, 1.0);
     }
@@ -120,11 +129,11 @@ export function createEarth({ key, renderer }) {
   tiles.group.matrixAutoUpdate = false;
   scene.add(tiles.group);
 
-  const sun = new Vector3(-0.55, 0.62, 0.56).normalize();
-  const horizon = lin('#cbd6e2'), zenith = lin('#5b86c4');
+  const sun = new Vector3(-0.75, 0.1, 0.65).normalize();     // low in the south-west
+  const horizon = lin('#c9a99a'), zenith = lin('#1c2b4a'), glow = lin('#ff9a5c');
   const sky = new ShaderMaterial({
     ...SKY, side: BackSide, depthWrite: false,
-    uniforms: { uHorizon: { value: horizon }, uZenith: { value: zenith }, uSun: { value: sun }, uSpace: { value: 0 } },
+    uniforms: { uHorizon: { value: horizon }, uZenith: { value: zenith }, uSun: { value: sun }, uGlow: { value: glow }, uSpace: { value: 0 } },
   });
   const skyMesh = new Mesh(new SphereGeometry(10, 48, 24), sky);
   skyMesh.renderOrder = -20;
@@ -132,8 +141,8 @@ export function createEarth({ key, renderer }) {
   scene.add(skyMesh);
 
   const uniforms = {
-    uFade: { value: 0 }, uDensity: { value: 1 / 30000 }, uHaze: { value: horizon.clone() },
-    uWater: { value: lin('#2f5d72') }, uSkyRefl: { value: lin('#9fb6cc') },
+    uFade: { value: 0 }, uDensity: { value: 1 / 55000 }, uHaze: { value: horizon.clone().multiplyScalar(0.85) },
+    uWater: { value: lin('#1b3346') }, uSkyRefl: { value: lin('#7d8aa3') },
   };
   tiles.addEventListener('load-model', ({ scene: model, tile }) => {
     model.traverse((o) => {
@@ -204,7 +213,7 @@ export function createEarth({ key, renderer }) {
       // haze thins with height; from orbit the sky turns to space
       const space = Math.min(1, Math.max(0, (alt - 40000) / 260000));
       sky.uniforms.uSpace.value = space * space * (3 - 2 * space);
-      uniforms.uDensity.value = 1 / Math.max(30000, alt * 6);
+      uniforms.uDensity.value = 1 / Math.max(55000, alt * 9);
 
       if (credit && time - creditAt > 1) {
         creditAt = time;
