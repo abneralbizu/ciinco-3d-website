@@ -75,8 +75,7 @@ export function createEarth({ key, renderer, sky, fog }) {
     WGS84_ELLIPSOID.getEastNorthUpFrame(lat * RAD, lon * RAD, base(lat), enu);
     toLocal.copy(axes).multiply(enu.invert());
     tiles.group.matrix.copy(toLocal);
-    tiles.group.matrixWorld.copy(toLocal);
-    tiles.group.matrixWorldNeedsUpdate = true;
+    tiles.group.updateMatrixWorld();   // also refreshes the inverse the tiles renderer uses
     WGS84_ELLIPSOID.getCartographicToPosition(g.pos[0] * RAD, g.pos[1] * RAD, g.pos[2] + base(g.pos[0]), v);
     outPos.copy(v.applyMatrix4(toLocal));
     WGS84_ELLIPSOID.getCartographicToPosition(g.look[0] * RAD, g.look[1] * RAD, g.look[2] + base(g.look[0]), v);
