@@ -81,6 +81,7 @@ const TILE = {
       float seaY = vP.y + dot(vP.xz, vP.xz) / (2.0 * 6371000.0);   // height above sea level (Earth's curve removed)
       float blue = smoothstep(-0.01, 0.03, c.b - c.r);
       float water = smoothstep(4.0, 1.5, abs(seaY)) * smoothstep(0.985, 0.998, up) * blue;
+      water = max(water, smoothstep(0.3, -0.6, seaY));             // anything below the surface (tile seams, skirts) is under water
       vec3 V = normalize(cameraPosition - vP);
       float fres = pow(1.0 - clamp(V.y, 0.0, 1.0), 4.0);
       float lum = dot(c, vec3(0.2126, 0.7152, 0.0722));
