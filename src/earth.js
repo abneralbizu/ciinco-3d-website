@@ -66,10 +66,26 @@ const TILE = {
     uniform float uFade;
     uniform float uDensity;
     uniform vec3 uHaze;
+    uniform vec3 uWater;
+    uniform vec3 uSkyRefl;
     varying vec2 vUv;
     varying vec3 vP;
     void main() {
       vec3 c = texture2D(map, vUv).rgb;
+      // Open water: Google stitches the harbour from tiles of slightly different colour, which
+      // shows as a patchwork of light and dark blocks. Flat, sea-level, bluish surfaces get one
+      // even water colour with a sky reflection toward the horizon instead. (Land, piers, boats
+      // and buildings stand above sea level and keep their photographs.)
+      vec3 N = normalize(cross(dFdx(vP), dFdy(vP)));
+      float up = abs(N.y);
+      float seaY = vP.y + dot(vP.xz, vP.xz) / (2.0 * 6371000.0);   // height above sea level (Earth's curve removed)
+      float blue = smoothstep(-0.01, 0.03, c.b - c.r);
+      float water = smoothstep(4.0, 1.5, abs(seaY)) * smoothstep(0.985, 0.998, up) * blue;
+      vec3 V = normalize(cameraPosition - vP);
+      float fres = pow(1.0 - clamp(V.y, 0.0, 1.0), 4.0);
+      float lum = dot(c, vec3(0.2126, 0.7152, 0.0722));
+      vec3 sea = mix(uWater, uSkyRefl, fres * 0.75) * (0.9 + 0.2 * clamp(lum / 0.12, 0.5, 1.5) - 0.1);
+      c = mix(c, sea, water);
       c = mix(c, c * c * (3.0 - 2.0 * c), 0.18);            // a little contrast back (aerial photos are flat)
       float dist = length(vP - cameraPosition);
       float f = 1.0 - exp(-dist * uDensity);
@@ -114,7 +130,10 @@ export function createEarth({ key, renderer }) {
   skyMesh.frustumCulled = false;
   scene.add(skyMesh);
 
-  const uniforms = { uFade: { value: 0 }, uDensity: { value: 1 / 30000 }, uHaze: { value: horizon.clone() } };
+  const uniforms = {
+    uFade: { value: 0 }, uDensity: { value: 1 / 30000 }, uHaze: { value: horizon.clone() },
+    uWater: { value: lin('#2f5d72') }, uSkyRefl: { value: lin('#9fb6cc') },
+  };
   tiles.addEventListener('load-model', ({ scene: model, tile }) => {
     model.traverse((o) => {
       if (!o.isMesh) return;
