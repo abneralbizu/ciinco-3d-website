@@ -89,6 +89,9 @@ export const sky = {
     uniform float uDay;     // 0 night (generated cities), 1 golden hour (photographed cities)
     uniform sampler2D uPhoto;  // dusk sky photograph (Canva), horizon at the bottom
     uniform float uPhotoOn;
+    uniform vec3 uFogCool;
+    uniform vec3 uFogWarm;
+    uniform float uHorizonHaze;
     varying vec3 vDir;
     ${HASH}
     void main() {
@@ -120,6 +123,13 @@ export const sky = {
       }
       // below the horizon: deep haze
       col = mix(col, uHorizon * 0.55, smoothstep(0.0, -0.2, h));
+      // night flight: the horizon dissolves into the same haze as the distant city
+      {
+        vec2 a2 = normalize(d.xz + 1e-5), b2 = normalize(uSunDir.xz + 1e-5);
+        float w2 = pow(max(dot(a2, b2), 0.0), 5.0) * 0.7;
+        vec3 hz = mix(uFogCool, uFogWarm, w2);
+        col = mix(col, hz, uHorizonHaze * exp(-abs(h - 0.005) * 22.0));
+      }
       // stars, fading in toward the zenith
       vec2 sp = vec2(atan(d.z, d.x) * 180.0, h * 260.0);
       vec2 cell = floor(sp);
@@ -233,6 +243,11 @@ export const ground = {
         float pier = smoothstep(7.0, 7.15, g.x) * onGrid;
         vec2 pq = p * m / 30.0;
         float pierLamp = step(0.93, hash12(floor(pq))) * smoothstep(0.18, 0.0, length(fract(pq) - 0.5)) * 0.4;
+        // lit windows between the streets: Manhattan glows as a whole at night, not just its lamps
+        vec2 lot = floor(vec2(avc * 4.0, g.y * 2.0));
+        float lit = smoothstep(0.25, 0.9, hash12(lot)) * (0.6 + 0.4 * fbm(p * m / 400.0));
+        float far2 = clamp(fwidth(g.y) * 2.0, 0.0, 1.0);
+        glow += mix(lit * lit, 0.35, far2) * 0.035 * (1.0 - pier);
         glow += mix(mix(old, grid, onGrid), pierLamp, pier);
         col = mix(col, vec3(0.018, 0.018, 0.022), pier);
       } else {
@@ -352,6 +367,7 @@ export const buildings = {
     uniform sampler2D uBrick;   // facade photographs (Canva): brick walk-up and glass office tower
     uniform sampler2D uGlass;
     uniform float uFacadeOn;
+    uniform float uNightK;      // night flight: dark silhouettes, brighter windows
     ${FOG}
     ${HASH}
     ${NIGHT}
@@ -401,6 +417,7 @@ export const buildings = {
 
       vec3 albedo = masonry(s, florida);
       if (plant > 0.5) albedo = vec3(0.24, 0.24, 0.25);
+      albedo *= mix(1.0, 0.3, uNightK);
       vec3 amb = nightLight(N, yM);
       vec3 wall = albedo * amb;
       vec3 Np = N;
@@ -433,7 +450,7 @@ export const buildings = {
       float tint = hash12(vec2(suite, cell.y) + vSeed * 11.0);
       vec3 warm = mix(vec3(1.0, 0.62, 0.34), vec3(1.0, 0.78, 0.55), tint);          // 2700-3500 K
       vec3 office = mix(vec3(0.82, 0.88, 1.0), vec3(1.0, 0.86, 0.68), step(0.7, tint)); // LED office, a few warm
-      vec3 room = (glassy > 0.5 ? office : mix(warm, vec3(0.75, 0.84, 1.0), step(0.86, tint))) * (0.22 + 0.33 * hash12(cell + vSeed * 5.0));
+      vec3 room = (glassy > 0.5 ? office : mix(warm, vec3(0.75, 0.84, 1.0), step(0.86, tint))) * (0.22 + 0.33 * hash12(cell + vSeed * 5.0)) * mix(1.0, 1.8, uNightK);
       float ceiling = 0.75 + 0.5 * smoothstep(0.3, 0.95, f.y);                     // brighter near the ceiling
       vec3 dark = vec3(0.003, 0.004, 0.006) + skyEnv(R) * (0.05 + 0.7 * fres);         // unlit glass reflects the sky
 

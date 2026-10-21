@@ -28,6 +28,7 @@ function webglOK() {
 }
 const shortSide = Math.min(screen.width, screen.height);
 const quality = {
+  night: params.has('night'),   // preview: night-flight chapters, no Google
   low: params.has('low') || shortSide < 700 || (navigator.hardwareConcurrency || 8) <= 4 || (navigator.deviceMemory || 8) <= 4,
 };
 const maxDPR = quality.low ? 1.5 : 1.75;
@@ -148,6 +149,7 @@ async function boot() {
   const [nyc, map] = await Promise.all([getJSON('assets/data/nyc.json'), getJSON('assets/data/map.json')]);
 
   const world = buildWorld(scene, { map: mapTex, sky: skyTex, brick: brickTex, glass: glassTex }, { nyc, map }, quality);
+  if (params.has('nobld')) world.nycBuildings.mesh.visible = false;
   if (params.has('debug')) console.info('stats', JSON.stringify({ nycBuildings: world.nycBuildings.count, homes: world.homeCount, ...world.stats }));
 
   // ---- Post-processing ---------------------------------------------------------
@@ -221,7 +223,7 @@ async function boot() {
   // Only Google's 3D tiles and the sky; the drawn cities are the fallback if Google fails.
   const gkey = (document.querySelector('meta[name="gmaps-key"]')?.content || '').trim();
   let earth = null;
-  if (gkey && !params.has('generated')) {
+  if (gkey && !params.has('generated') && !quality.night) {
     try { earth = createEarth({ key: gkey, renderer }); } catch (e) { console.warn('3D tiles unavailable', e); }
   }
   // ?gcam=lat,lon,altM,lookLat,lookLon,lookAltM places the camera anywhere on the globe (tuning)
@@ -470,7 +472,7 @@ async function boot() {
     camera.updateMatrixWorld();
 
     // haze, clouds, map lights by altitude
-    world.fog.density.value = 1 / Math.max(260, alt * 5);
+    world.fog.density.value = quality.night ? 1 / Math.max(230, alt * 4) : 1 / Math.max(260, alt * 5);
     world.fog.detail.value = 1 - smooth(140, 700, alt);
     world.clouds.uniforms.uOpacity.value = 0.42 * smooth(110, 600, alt) * (1 - smooth(25000, 40000, alt)) + 0.5 * frame.flight * smooth(60, 200, alt);
     world.map.uniforms.uLights.value = 0.6 + 0.6 * smooth(50, 3000, alt);

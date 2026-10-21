@@ -10,7 +10,8 @@ import { P } from './geo.js';
 export const KEYFRAMES = [
   { name: 'Offices', pos: [25.6, -80.6, 2700000], look: [35.6, -77.9, 0], ox: 0.24, oy: 0.02, my: 0.1, fov: 36, mob: 1.25 },
   { name: 'Skyline', pos: [40.6868, -74.0525, 38], look: [40.6950, -74.0345, 90], ox: 0.14, oy: 0, my: 0.2, fov: 40, mob: 1.15,
-    g: { pos: [40.6846, -74.0530, 230], look: [40.6975, -74.0290, 110] } },
+    g: { pos: [40.6846, -74.0530, 230], look: [40.6975, -74.0290, 110] },
+    n: { pos: [40.6720, -74.0700, 900], look: [40.7080, -74.0100, 150], ox: 0.24 } },
   { name: 'Commercial', pos: [40.7460, -74.0150, 230], look: [40.7585, -73.9850, 190], ox: 0.27, oy: 0, my: 0.12, fov: 40, mob: 1.3,
     g: { pos: [40.7395, -74.0330, 480], look: [40.7560, -73.9930, 120] } },
   { name: 'Residential', pos: [28.6500, -81.2690, 115], look: [28.6560, -81.2600, 0], ox: -0.27, oy: 0, my: 0.14, fov: 40, mob: 1.25,
@@ -25,7 +26,9 @@ export const KEYFRAMES = [
     g: { pos: [28.6380, -81.2900, 600], look: [28.6640, -81.2550, 0] } },
 ];
 
-const K = KEYFRAMES.map((kf) => ({ ...kf, P: P(...kf.pos), Lk: P(...kf.look) }));
+// ?night (preview): night-flight framings, high enough that the city reads as its lights
+const NIGHT = typeof location !== 'undefined' && new URLSearchParams(location.search).has('night');
+const K = KEYFRAMES.map((k0) => { const kf = { ...k0, ...(NIGHT && k0.n ? k0.n : {}) }; return { ...kf, P: P(...kf.pos), Lk: P(...kf.look) }; });
 const N = K.length;
 
 const ease = (t) => t * t * t * (t * (t * 6 - 15) + 10);
