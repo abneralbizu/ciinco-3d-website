@@ -521,3 +521,19 @@ body.real-cities .gen-only { display: none; }
 
 /* Photographed Earth: no drawn labels over the photographs */
 body.real-cities #labels { display: none; }
+
+/* ---- Network maps (chapters 02-08) ------------------------------------------------- */
+.stage .netmap { position: absolute; inset: 0; opacity: 0; pointer-events: none; }
+.netmap .maplibregl-canvas { outline: none; }
+.netmap .maplibregl-ctrl-bottom-right { pointer-events: auto; right: 8px; bottom: 6px; }
+.netmap .maplibregl-ctrl-attrib { background: rgba(3, 4, 10, 0.55) !important; color: rgba(238, 241, 248, 0.55); font: 10px/1.4 var(--f-sans); }
+.netmap .maplibregl-ctrl-attrib a { color: rgba(238, 241, 248, 0.7); }
+.netmap .maplibregl-ctrl-attrib-button { filter: invert(1) opacity(0.6); }
+.nm-labels { position: absolute; inset: 0; pointer-events: none; overflow: hidden; }
+.nm-label { position: absolute; left: 0; top: 0; white-space: nowrap; font-family: var(--f-mono); font-size: 0.6rem; letter-spacing: 0.14em; text-transform: uppercase; color: rgba(214, 226, 255, 0.72); opacity: 0; transition: opacity 0.45s, color 0.3s; will-change: transform, opacity; }
+.nm-label span { display: inline-block; transform: translate(12px, -50%); text-shadow: 0 0 6px rgba(3, 4, 10, 0.9), 0 0 2px rgba(3, 4, 10, 1); }
+.nm-label.nm-hub { color: var(--ink); font-size: 0.66rem; }
+.nm-label.nm-hub span { transform: translate(16px, -50%); }
+.nm-label.is-on { opacity: 1; }
+.nm-label.is-hot { color: var(--gold); }
+body.netmap-on #labels, body.netmap-on #map-credit { display: none; }

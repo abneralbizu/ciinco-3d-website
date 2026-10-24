@@ -12,6 +12,7 @@ import { ShaderPass } from 'three/addons/postprocessing/ShaderPass.js';
 import { Pass, FullScreenQuad } from 'three/addons/postprocessing/Pass.js';
 import { buildWorld } from './world.js';
 import { createEarth } from './earth.js';
+import { createNetMap } from './netmap.js';
 import { sampleJourney, sampleJourneyGeo, CHAPTERS } from './journey.js';
 import { unproject, altitudeM, P } from './geo.js';
 import { initUI, setLoader, finishLoading, reducedMotion } from './ui.js';
@@ -29,6 +30,7 @@ function webglOK() {
 const shortSide = Math.min(screen.width, screen.height);
 const quality = {
   night: params.has('night'),   // preview: night-flight chapters, no Google
+  maps: params.has('maps'),     // preview: network maps for chapters 02-08, no Google
   low: params.has('low') || shortSide < 700 || (navigator.hardwareConcurrency || 8) <= 4 || (navigator.deviceMemory || 8) <= 4,
 };
 const maxDPR = quality.low ? 1.5 : 1.75;
@@ -223,7 +225,7 @@ async function boot() {
   // Only Google's 3D tiles and the sky; the drawn cities are the fallback if Google fails.
   const gkey = (document.querySelector('meta[name="gmaps-key"]')?.content || '').trim();
   let earth = null;
-  if (gkey && !params.has('generated') && !quality.night) {
+  if (gkey && !params.has('generated') && !quality.night && !quality.maps) {
     try { earth = createEarth({ key: gkey, renderer }); } catch (e) { console.warn('3D tiles unavailable', e); }
   }
   // ?gcam=lat,lon,altM,lookLat,lookLon,lookAltM places the camera anywhere on the globe (tuning)
@@ -231,6 +233,23 @@ async function boot() {
   const gframe = { pos: [0, 0, 0], look: [0, 0, 0], ox: 0, oy: 0, fov: 40, pull: 1, flight: 0 };
   const ePos = new Vector3(), eLook = new Vector3();
   let earthMode = null;   // switches the page between Google's Earth and the drawn cities
+
+  // ---- Network maps (chapters 02-08; the 01 opening stays the 3D night map) -----------------
+  let netmap = null, netHost = null, netMix = -1;
+  if (quality.maps) {
+    netHost = document.createElement('div');
+    netHost.className = 'netmap';
+    canvas.insertAdjacentElement('afterend', netHost);
+    const services = Array.from(document.querySelectorAll('#consulting li')).map((li) => li.textContent.trim());
+    try {
+      if (!window.maplibregl) {
+        await new Promise((ok, fail) => { const sc = document.createElement('script'); sc.src = 'assets/js/maplibre-gl.js'; sc.onload = ok; sc.onerror = fail; document.head.appendChild(sc); });
+      }
+      netmap = createNetMap({ container: netHost, services });
+      document.body.classList.add('has-netmap');
+      if (params.has('debug')) window.__netmap = netmap;
+    } catch (e) { console.warn('network map unavailable', e); netHost.remove(); netmap = null; }
+  }
   // Night (generated cities) and golden hour (photographed cities) palettes for sky and haze.
   const palette = {
     night: { zenith: world.uZenith.value.clone(), horizon: world.sky.uniforms.uHorizon.value.clone(), glow: world.sky.uniforms.uGlow.value.clone(), cool: world.fog.cool.value.clone(), warm: world.fog.warm.value.clone() },
@@ -301,6 +320,7 @@ async function boot() {
     world.uPixelRatio.value = dpr;
     sizeReflection();
     if (earth) earth.resize();
+    if (netmap) netmap.resize();
     computeAnchors();
   }
   window.addEventListener('resize', resize);
@@ -388,6 +408,30 @@ async function boot() {
     if (!reducedMotion.matches && finePointer) {
       parallax.x += (pointer.x - parallax.x) * (1 - Math.exp(-dt * 2.5));
       parallax.y += (pointer.y - parallax.y) * (1 - Math.exp(-dt * 2.5));
+    }
+
+    // ---- Network maps: fade in on the way down from the opening; the 3D stops once hidden ----
+    if (netmap) {
+      const mm = smooth(0.25, 0.75, pSmooth);
+      if (Math.abs(mm - netMix) > 0.002 || (mm === 1 && netMix !== 1) || (mm === 0 && netMix !== 0)) {
+        netMix = mm;
+        netHost.style.opacity = String(mm);
+        canvas.style.opacity = String(1 - mm);
+        document.body.classList.toggle('netmap-on', mm > 0.5);
+        if (mm > 0.5) { worldHit = null; if (finePointer) cursor.classList.remove('is-world'); }
+      }
+      const v = netmap.update(pSmooth, time, mm, hotType, hotNode, hotOffice, pointer);
+      if (mm < 0.01) netmap.hideLabels();
+      if (mm > 0.999) {
+        if (v && time - lastUI > 0.1) {
+          lastUI = time;
+          const lat = v.center[1];
+          const mpp = (40075016.686 * Math.cos(lat * Math.PI / 180)) / (512 * Math.pow(2, v.zoom));
+          const altM = (H() * mpp / 2) / Math.tan(18 * Math.PI / 180);
+          bus.setProgress(p, Math.round(p), `${fmtLat(lat)} · ${fmtLon(v.center[0])} · ALT ${fmtAlt(altM)}`);
+        }
+        return;
+      }
     }
 
     // ---- Our drawn opening (01) crossfades into Google's Earth on the way down ----

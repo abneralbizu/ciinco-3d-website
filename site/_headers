@@ -3,12 +3,12 @@
 #
 # Content-Security-Policy: everything is served from this site, except the
 # optional Crexi listings viewer (frame-src) and Google's photographed 3D cities
-# (tile.googleapis.com). 'wasm-unsafe-eval' lets the self-hosted Draco decoder
+# (tile.googleapis.com) and the street maps (tiles.openfreemap.org, OpenStreetMap data). 'wasm-unsafe-eval' lets the self-hosted Draco decoder
 # (assets/draco) unpack the city geometry; no other script or eval is allowed.
 # If the contact form is moved to an outside form service, add its address
 # to form-action and connect-src (for example: https://formspree.io).
 /*
-  Content-Security-Policy: default-src 'self'; script-src 'self' 'wasm-unsafe-eval'; style-src 'self'; img-src 'self' data: blob: https://tile.googleapis.com; font-src 'self'; connect-src 'self' https://tile.googleapis.com; frame-src https://www.crexi.com; form-action 'self'; frame-ancestors 'none'; base-uri 'self'; object-src 'none'; worker-src 'self' blob:; manifest-src 'self'; upgrade-insecure-requests
+  Content-Security-Policy: default-src 'self'; script-src 'self' 'wasm-unsafe-eval'; style-src 'self'; img-src 'self' data: blob: https://tile.googleapis.com; font-src 'self'; connect-src 'self' https://tile.googleapis.com https://tiles.openfreemap.org; frame-src https://www.crexi.com; form-action 'self'; frame-ancestors 'none'; base-uri 'self'; object-src 'none'; worker-src 'self' blob:; manifest-src 'self'; upgrade-insecure-requests
   X-Content-Type-Options: nosniff
   X-Frame-Options: DENY
   Referrer-Policy: strict-origin-when-cross-origin
