@@ -7,8 +7,8 @@ import { grid, PLACES } from './geo.js';
 
 const TILES = 'https://tiles.openfreemap.org/planet';
 const C = {
-  land: '#0a0d16', water: '#050a14', shore: '#1a2a45', park: '#0b1413',
-  bld: '#10151f', bldLine: '#161d2b', minor: '#151b28', major: '#1f2738', motor: '#2b3550', state: '#232c40',
+  land: '#0d111c', water: '#04060c', shore: '#24395e', park: '#0d1716',
+  bld: '#131926', bldLine: '#1a2231', minor: '#1a2131', major: '#262f45', motor: '#33405f', state: '#2a3550',
 };
 // Which side of the screen each chapter's text sits on (matches ui.js)
 const SIDES = ['left', 'left', 'left', 'right', 'left', 'center', 'right', 'left'];
