@@ -103,7 +103,7 @@ function buildNetwork(serviceNames) {
   // advisory services: a ring around the Florida office, numbered like the list
   serviceNames.forEach((name, i) => {
     const ang = (i / serviceNames.length) * Math.PI * 2 - Math.PI / 2;
-    const p = [FL[0] + Math.cos(ang) * 0.085 / Math.cos(FL[1] * Math.PI / 180), FL[1] + Math.sin(ang) * 0.085];
+    const p = [FL[0] + Math.cos(ang) * 0.05 / Math.cos(FL[1] * Math.PI / 180), FL[1] + Math.sin(ang) * 0.05];
     add(`s${i}`, p, { kind: 'node', label: `${String(i + 1).padStart(2, '0')} · ${name}`, short: String(i + 1).padStart(2, '0'), ch: '4', service: i, quiet: 1 });
     link(`s${i}`, FL, p, [4], 0.08, { service: i });
   });
@@ -175,13 +175,55 @@ export function createNetMap({ container, services }) {
     map.setFeatureState({ source: src, id }, s);
   }
 
+  // Each chapter frames its own part of the network in the space its text leaves free, at any
+  // screen size: the bounds of its nodes, fitted beside (or, for centred and full-width
+  // chapters, behind) the text.
+  const FRAME = [
+    { keys: null, b: 0 },
+    { keys: ['hub-ny', 'd'], b: 29 },
+    { keys: ['hub-ny', 't'], b: 29 },
+    { keys: ['hub-fl', 'h'], b: 0 },
+    { keys: ['hub-fl', 's'], b: 0 },
+    { keys: ['hub-ny', 'hub-fl'], b: 0, behind: true },
+    { keys: ['hub-fl', 'm'], b: 0 },
+    { keys: ['hub-ny', 'hub-fl'], b: 0, behind: true },
+  ];
+  const chapterEls = Array.from(document.querySelectorAll('.chapter'));
+  const textEl = (ch) => ch && (ch.querySelector('.panel') || ch.querySelector('.contact-intro') || ch.querySelector('.wrap'));
+  let frames = null;
+  function computeFrames() {
+    const W = window.innerWidth, H = window.innerHeight;
+    const head = 90, foot = 70, gap = 48;
+    frames = FRAME.map((F, i) => {
+      if (!F.keys) return VIEWS[0];
+      const pts = net.nodes.filter((n) => F.keys.some((k) => n.properties.key === k || (k.length === 1 && n.properties.key.startsWith(k) && /\d/.test(n.properties.key[1])))).map((n) => n.geometry.coordinates);
+      const lons = pts.map((q) => q[0]), lats = pts.map((q) => q[1]);
+      const bounds = [[Math.min(...lons), Math.min(...lats)], [Math.max(...lons), Math.max(...lats)]];
+      const r = textEl(chapterEls[i]) ? textEl(chapterEls[i]).getBoundingClientRect() : null;
+      let pad = { top: head, bottom: foot, left: 60, right: 60 };
+      const wide = !r || r.width > W * 0.62 || W / H < 0.9 || F.behind;
+      if (!wide) {
+        const mid = r.left + r.width / 2;
+        if (mid < W / 2) pad.left = Math.min(W * 0.7, r.right + gap); else pad.right = Math.min(W * 0.7, W - r.left + gap);
+      }
+      if (W / H < 0.9) pad = { top: H * 0.45, bottom: foot, left: 30, right: 30 };   // phones: below the headline
+      const cam = map.cameraForBounds(bounds, { padding: pad, bearing: F.b, maxZoom: 14 });
+      if (!cam) return VIEWS[i];
+      const c = cam.center.toArray ? cam.center.toArray() : [cam.center.lng, cam.center.lat];
+      return { c, z: cam.zoom, b: F.b };
+    });
+  }
+  window.addEventListener('resize', () => { frames = null; });
+  if (document.fonts) document.fonts.ready.then(() => { frames = null; });
+
   // view along the scroll: glide between chapters; between the two cities, rise high enough to see both
   const merc = (c) => maplibregl.MercatorCoordinate.fromLngLat(c);
   const ease = (t) => t * t * t * (t * (t * 6 - 15) + 10);
   function viewAt(p, W) {
-    const i = Math.min(VIEWS.length - 2, Math.max(0, Math.floor(p)));
+    const i = Math.min(FRAME.length - 2, Math.max(0, Math.floor(p)));
     const t = ease(Math.min(1, Math.max(0, p - i)));
-    const A = VIEWS[i], B = VIEWS[i + 1];
+    if (!frames) computeFrames();
+    const A = frames[i], B = frames[i + 1];
     const a = merc(A.c), b = merc(B.c);
     const d = Math.hypot(b.x - a.x, b.y - a.y);
     const fit = Math.log2((W * 0.8) / (512 * Math.max(d, 1e-9)));        // zoom that shows both centres
@@ -205,17 +247,7 @@ export function createNetMap({ container, services }) {
       if (mix < 0.01) return null;
       const W = window.innerWidth, H = window.innerHeight;
       const v = viewAt(p, W);
-      // keep the subject clear of the chapter's text
-      const narrow = W / H < 0.9;
-      const sideA = SIDES[v.i], sideB = SIDES[Math.min(SIDES.length - 1, v.i + 1)];
-      const pad = (side) => (narrow ? { left: 0, right: 0, top: H * 0.25, bottom: 0 }
-        : side === 'left' ? { left: W * 0.46, right: 0, top: 0, bottom: 0 }
-          : side === 'right' ? { left: 0, right: W * 0.46, top: 0, bottom: 0 }
-            : { left: 0, right: 0, top: H * 0.3, bottom: 0 });
-      const pa = pad(sideA), pb = pad(sideB);
-      const padding = {};
-      for (const k of ['left', 'right', 'top', 'bottom']) padding[k] = pa[k] + (pb[k] - pa[k]) * v.t;
-      map.jumpTo({ center: v.center, zoom: v.zoom, bearing: v.bearing, padding });
+      map.jumpTo({ center: v.center, zoom: v.zoom, bearing: v.bearing });
       if (!ready) return v;
 
       // which parts of the network belong to this stretch of the page
@@ -261,14 +293,17 @@ export function createNetMap({ container, services }) {
         if (h) hover = net.nodes.find((n) => n.id === h.id) || null;
       }
 
-      // labels
+      // labels: never under the current chapter's text
+      const cur = textEl(chapterEls[Math.round(p)]);
+      const tr = cur ? cur.getBoundingClientRect() : null;
       for (const L of labels) {
         const pr = L.f.properties;
         const quiet = pr.quiet && !L.f._hot;
         const show = L.f._w > 0.55 && mix > 0.6 && !quiet;
         if (show) {
           const s = map.project(L.f.geometry.coordinates);
-          const onScreen = s.x > -50 && s.x < W + 50 && s.y > -20 && s.y < H + 20;
+          const under = tr && s.x > tr.left - 30 && s.x < tr.right + 10 && s.y > tr.top - 14 && s.y < tr.bottom + 14;
+          const onScreen = s.x > -50 && s.x < W - 120 && s.y > 70 && s.y < H - 30 && !under;
           L.el.style.transform = `translate3d(${s.x.toFixed(1)}px, ${s.y.toFixed(1)}px, 0)`;
           L.el.classList.toggle('is-on', onScreen);
           L.el.classList.toggle('is-hot', !!L.f._hot);
