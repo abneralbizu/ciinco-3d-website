@@ -412,7 +412,7 @@ async function boot() {
 
     // ---- Network maps: fade in on the way down from the opening; the 3D stops once hidden ----
     if (netmap) {
-      const mm = smooth(0.25, 0.75, pSmooth);
+      const mm = smooth(0.12, 0.5, pSmooth);
       if (Math.abs(mm - netMix) > 0.002 || (mm === 1 && netMix !== 1) || (mm === 0 && netMix !== 0)) {
         netMix = mm;
         netHost.style.opacity = String(mm);
