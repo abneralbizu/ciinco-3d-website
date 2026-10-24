@@ -201,10 +201,11 @@ export function createNetMap({ container, services }) {
       const bounds = [[Math.min(...lons), Math.min(...lats)], [Math.max(...lons), Math.max(...lats)]];
       const r = textEl(chapterEls[i]) ? textEl(chapterEls[i]).getBoundingClientRect() : null;
       let pad = { top: head, bottom: foot, left: 60, right: 60 };
-      const wide = !r || r.width > W * 0.62 || W / H < 0.9 || F.behind;
+      const leftText = r && r.left + r.width / 2 < W / 2;
+      const free = !r ? W : leftText ? W - r.right : r.left;      // width of the space beside the text
+      const wide = !r || free < 300 || W / H < 0.9 || F.behind;
       if (!wide) {
-        const mid = r.left + r.width / 2;
-        if (mid < W / 2) pad.left = Math.min(W * 0.7, r.right + gap); else pad.right = Math.min(W * 0.7, W - r.left + gap);
+        if (leftText) pad.left = r.right + gap; else pad.right = W - r.left + gap;
       }
       if (W / H < 0.9) pad = { top: H * 0.45, bottom: foot, left: 30, right: 30 };   // phones: below the headline
       const cam = map.cameraForBounds(bounds, { padding: pad, bearing: F.b, maxZoom: 14 });
