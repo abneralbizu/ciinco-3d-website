@@ -304,7 +304,8 @@ export function createNetMap({ container, services }) {
         if (show) {
           const s = map.project(L.f.geometry.coordinates);
           const under = tr && s.x > tr.left - 30 && s.x < tr.right + 10 && s.y > tr.top - 14 && s.y < tr.bottom + 14;
-          const onScreen = s.x > -50 && s.x < W - 120 && s.y > 70 && s.y < H - 30 && !under;
+          const onScreen = s.x > 10 && s.x < W - 10 && s.y > 70 && s.y < H - 30 && !under;
+          L.el.classList.toggle('is-left', s.x > W * 0.72);   // near the right edge: name to the left of the dot
           L.el.style.transform = `translate3d(${s.x.toFixed(1)}px, ${s.y.toFixed(1)}px, 0)`;
           L.el.classList.toggle('is-on', onScreen);
           L.el.classList.toggle('is-hot', !!L.f._hot);

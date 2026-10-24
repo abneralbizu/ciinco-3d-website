@@ -537,3 +537,5 @@ body.real-cities #labels { display: none; }
 .nm-label.is-on { opacity: 1; }
 .nm-label.is-hot { color: var(--gold); }
 body.netmap-on #labels, body.netmap-on #map-credit { display: none; }
+.nm-label.is-left span { transform: translate(calc(-100% - 12px), -50%); }
+.nm-label.nm-hub.is-left span { transform: translate(calc(-100% - 16px), -50%); }
