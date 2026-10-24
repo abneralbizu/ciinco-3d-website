@@ -207,7 +207,7 @@ export function createNetMap({ container, services }) {
       if (!wide) {
         if (leftText) pad.left = r.right + gap; else pad.right = W - r.left + gap;
       }
-      if (W / H < 0.9) pad = { top: H * 0.45, bottom: foot, left: 30, right: 30 };   // phones: below the headline
+      if (W / H < 0.9) pad = { top: 80, bottom: H * 0.62, left: 28, right: 28 };   // phones: in the open space above the text card
       const cam = map.cameraForBounds(bounds, { padding: pad, bearing: F.b, maxZoom: 14 });
       if (!cam) return VIEWS[i];
       const c = cam.center.toArray ? cam.center.toArray() : [cam.center.lng, cam.center.lat];
