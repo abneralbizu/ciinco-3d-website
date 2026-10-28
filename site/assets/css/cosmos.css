@@ -96,7 +96,7 @@ h1[tabindex="-1"]:focus, h2[tabindex="-1"]:focus, .chapter[tabindex="-1"]:focus 
 /* 4. Stage & loader ---------------------------------------------------- */
 .stage { position: fixed; inset: 0; z-index: 0; pointer-events: none; }
 .stage canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block; pointer-events: auto; touch-action: pan-y; }
-.stage-fallback { position: absolute; inset: 0; display: none; background: radial-gradient(ellipse at 70% 40%, rgba(76, 60, 200, 0.25), transparent 60%), url("../images/og-image.jpg") center / cover no-repeat, var(--bg); }
+.stage-fallback { position: absolute; inset: 0; display: none; background: radial-gradient(ellipse at 70% 40%, rgba(76, 60, 200, 0.25), transparent 60%), url("../images/night-map.jpg") center / cover no-repeat, var(--bg); }
 /* Edge shading so text always has something dark under it. */
 /* Shade behind whichever side holds the text, so it reads over a lit city. */
 .scrim { position: absolute; inset: 0; pointer-events: none; opacity: 0; transition: opacity 0.9s var(--ease-io); }

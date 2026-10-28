@@ -52,6 +52,10 @@ Spanish page too.** The privacy policy, accessibility statement and Standardized
 English only; the Spanish pages link to them marked "(en inglés)". Have a fluent reviewer read new Spanish text
 before launch, and translate the legal pages only with legal review. When the site has its final domain, change
 the `hreflang` links in the page heads to full addresses (for example `https://ciinco.com/es/`).
+The link-preview tags (`og:url`, `og:image`, `twitter:image`) already use full addresses on the GitHub
+Pages preview (`https://abneralbizu.github.io/ciinco-3d-website/`); change those to the final domain too.
+The preview pictures are `assets/images/share-en.jpg` and `share-es.jpg` (1200×630). Give a new picture a new
+file name, because iMessage, Facebook and LinkedIn keep showing a cached copy of an old one.
 
 ## Folder layout
 
