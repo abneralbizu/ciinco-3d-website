@@ -141,14 +141,12 @@ body:not(.is-loading) .loader { opacity: 0; visibility: hidden; }
 .site-header.is-hidden { transform: translateY(-110%); }
 .brand { display: inline-flex; align-items: center; gap: 12px; text-decoration: none; color: var(--ink); }
 .brand-mark { width: 50px; height: 28px; flex: none; }
-/* The full name beside the mark, set like the logo: the first line light, the second in the logo's blue. */
-.brand-word { display: grid; gap: 3px; font-weight: 600; font-stretch: 112%; letter-spacing: 0.14em; font-size: 0.7rem; line-height: 1.1; text-transform: uppercase; white-space: nowrap; }
-.bw-2 { color: #7fa8e3; font-weight: 500; letter-spacing: 0.135em; }
+/* The full name beside the mark, in the logo's own lettering (assets/images/ciinco-wordmark-on-dark.svg). */
+.brand-word { display: block; height: 34px; width: auto; }
 @media (max-width: 520px) {
   .brand { gap: 9px; }
   .brand .brand-mark { width: 40px; height: 22px; }
-  .brand-word { font-size: 0.56rem; letter-spacing: 0.08em; gap: 2px; }
-  .bw-2 { letter-spacing: 0.075em; }
+  .brand-word { height: 28px; }
 }
 .site-nav ul { list-style: none; margin: 0; padding: 0; display: flex; gap: clamp(14px, 2.2vw, 34px); align-items: center; }
 .site-nav a { text-decoration: none; color: var(--ink-2); font-size: 0.82rem; letter-spacing: 0.04em; position: relative; padding-block: 6px; transition: color 0.3s; }
@@ -591,8 +589,7 @@ body.netmap-on #labels, body.netmap-on #map-credit { display: none; }
   .site-header { padding-inline: 16px; }
   .brand { gap: 7px; }
   .brand .brand-mark { width: 34px; height: 19px; }
-  .brand-word { font-size: 0.5rem; letter-spacing: 0.05em; }
-  .bw-2 { letter-spacing: 0.045em; }
+  .brand-word { height: 25px; }
   .header-end { gap: 8px; }
   .lang-switch a { min-width: 26px; padding: 7px 6px; }
   .nav-toggle { width: 40px; height: 40px; }
