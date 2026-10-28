@@ -13,6 +13,7 @@ import { Pass, FullScreenQuad } from 'three/addons/postprocessing/Pass.js';
 import { buildWorld } from './world.js';
 import { createEarth } from './earth.js';
 import { createNetMap } from './netmap.js';
+import { t as tr, BASE } from './i18n.js';
 import { sampleJourney, sampleJourneyGeo, CHAPTERS } from './journey.js';
 import { unproject, altitudeM, P } from './geo.js';
 import { initUI, setLoader, finishLoading, reducedMotion } from './ui.js';
@@ -30,7 +31,7 @@ function webglOK() {
 const shortSide = Math.min(screen.width, screen.height);
 const quality = {
   night: params.has('night'),   // preview: night-flight chapters, no Google
-  maps: params.has('maps'),     // preview: network maps for chapters 02-08, no Google
+  maps: !params.has('google'),  // network maps for chapters 02-08 (Google's 3D only with ?google)
   low: params.has('low') || shortSide < 700 || (navigator.hardwareConcurrency || 8) <= 4 || (navigator.deviceMemory || 8) <= 4,
 };
 const maxDPR = quality.low ? 1.5 : 1.75;
@@ -134,21 +135,21 @@ async function boot() {
   const manager = new LoadingManager();
   const loader = new TextureLoader(manager);
   const mapTex = await new Promise((res) => {
-    const t = loader.load(`assets/textures/${quality.low ? 'map-2k' : 'map'}.webp`, () => { bump(); res(t); }, undefined, () => { bump(); res(t); });
+    const t = loader.load(`${BASE}assets/textures/${quality.low ? 'map-2k' : 'map'}.webp`, () => { bump(); res(t); }, undefined, () => { bump(); res(t); });
     t.colorSpace = NoColorSpace;
     t.anisotropy = Math.min(8, renderer.capabilities.getMaxAnisotropy());
     t.minFilter = LinearMipmapLinearFilter;
   });
   // Photographs made in Canva: the dusk sky, and brick and glass facades for the generated buildings.
   const photo = (name, wrap) => new Promise((res) => {
-    const t = loader.load(`assets/textures/${name}.webp`, () => { bump(); res(t); }, undefined, () => { bump(); res(null); });
+    const t = loader.load(`${BASE}assets/textures/${name}.webp`, () => { bump(); res(t); }, undefined, () => { bump(); res(null); });
     t.colorSpace = SRGBColorSpace;
     t.wrapS = t.wrapT = wrap;
     t.anisotropy = Math.min(8, renderer.capabilities.getMaxAnisotropy());
   });
   const [skyTex, brickTex, glassTex] = await Promise.all([photo('sky-dusk', ClampToEdgeWrapping), photo('facade-brick', RepeatWrapping), photo('facade-glass', RepeatWrapping)]);
   const getJSON = (u) => fetch(u).then((r) => r.json()).then((j) => { bump(); return j; });
-  const [nyc, map] = await Promise.all([getJSON('assets/data/nyc.json'), getJSON('assets/data/map.json')]);
+  const [nyc, map] = await Promise.all([getJSON(`${BASE}assets/data/nyc.json`), getJSON(`${BASE}assets/data/map.json`)]);
 
   const world = buildWorld(scene, { map: mapTex, sky: skyTex, brick: brickTex, glass: glassTex }, { nyc, map }, quality);
   if (params.has('nobld')) world.nycBuildings.mesh.visible = false;
@@ -243,7 +244,7 @@ async function boot() {
     const services = Array.from(document.querySelectorAll('#consulting li')).map((li) => li.textContent.trim());
     try {
       if (!window.maplibregl) {
-        await new Promise((ok, fail) => { const sc = document.createElement('script'); sc.src = 'assets/js/maplibre-gl.js'; sc.onload = ok; sc.onerror = fail; document.head.appendChild(sc); });
+        await new Promise((ok, fail) => { const sc = document.createElement('script'); sc.src = `${BASE}assets/js/maplibre-gl.js`; sc.onload = ok; sc.onerror = fail; document.head.appendChild(sc); });
       }
       netmap = createNetMap({ container: netHost, services });
       document.body.classList.add('has-netmap');
@@ -272,8 +273,8 @@ async function boot() {
     labelRoot.appendChild(el);
     return el;
   };
-  const officeLabels = world.offices.map((o) => ({ o, el: mkLabel('label-office', `<span class="dot"></span><span class="stem"></span><span class="txt"><b>${o.name}</b><small>${o.sub}</small></span>`) }));
-  const typeLabels = world.typeTargets.map((t) => ({ t, el: mkLabel('label-type', `<span class="dot"></span><span>${t.name}</span>`) }));
+  const officeLabels = world.offices.map((o) => ({ o, el: mkLabel('label-office', `<span class="dot"></span><span class="stem"></span><span class="txt"><b>${tr(o.name)}</b><small>${tr(o.sub)}</small></span>`) }));
+  const typeLabels = world.typeTargets.map((t) => ({ t, el: mkLabel('label-type', `<span class="dot"></span><span>${tr(t.name)}</span>`) }));
   const nodeNames = Array.from(document.querySelectorAll('#consulting li')).map((li) => li.textContent.trim());
   const floorLabels = nodeNames.map((name, i) => ({ i, el: mkLabel('label-node', `<span class="num">${String(i + 1).padStart(2, '0')}</span><span class="name">${name}</span>`) }));
 

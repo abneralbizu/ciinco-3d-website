@@ -1,0 +1,417 @@
+<!doctype html>
+<html lang="es" data-base="../">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <!-- Google Maps Platform key for the photographed 3D cities. Left empty in the repository;
+       the deploy step fills it in from a GitHub Actions secret (see README). -->
+  <meta name="gmaps-key" content="">
+  <title>CIIN Co. | Bienes raíces comerciales y residenciales en Florida y Nueva York</title>
+  <link rel="alternate" hreflang="en" href="../index.html">
+  <link rel="alternate" hreflang="es" href="index.html">
+  <meta name="description" content="Continental Investments International Network Co. Bienes raíces comerciales y residenciales en Florida y comerciales en Nueva York. Compra, venta, arrendamiento, debida diligencia y asesoría desde 1990.">
+  <meta name="theme-color" content="#03040a">
+  <meta name="color-scheme" content="dark">
+  <link rel="icon" href="../assets/images/favicon.svg" type="image/svg+xml">
+  <link rel="icon" href="../assets/images/favicon-32.png" sizes="32x32" type="image/png">
+  <link rel="apple-touch-icon" href="../assets/images/apple-touch-icon.png">
+  <meta property="og:type" content="website">
+  <meta property="og:locale" content="es_US">
+  <meta property="og:title" content="CIIN Co. | Desde la calle hasta el horizonte">
+  <meta property="og:description" content="Bienes raíces comerciales y residenciales en Florida y Nueva York, desde 1990.">
+  <meta property="og:image" content="../assets/images/og-image.jpg">
+  <meta name="twitter:card" content="summary_large_image">
+  <link rel="preload" href="../assets/fonts/archivo-variable.woff2" as="font" type="font/woff2" crossorigin>
+  <link rel="preload" href="../assets/fonts/instrument-serif-italic.woff2" as="font" type="font/woff2" crossorigin>
+  <link rel="stylesheet" href="../assets/css/cosmos.css?v=es1">
+  <link rel="stylesheet" href="../assets/css/maplibre-gl.css">
+  <script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@type": "RealEstateAgent",
+    "name": "Continental Investments International Network Co.",
+    "legalName": "Continental Investments International Network LLC",
+    "foundingDate": "1990",
+    "email": "rafael@ciinco.com",
+    "telephone": "+1-407-739-5959",
+    "address": [
+      {"@type": "PostalAddress", "streetAddress": "1073 Willa Springs Drive, Suite 1005", "addressLocality": "Winter Springs", "addressRegion": "FL", "postalCode": "32708", "addressCountry": "US"},
+      {"@type": "PostalAddress", "streetAddress": "276 Fifth Ave., Suite 704-265", "addressLocality": "New York", "addressRegion": "NY", "postalCode": "10001", "addressCountry": "US"}
+    ],
+    "areaServed": ["Florida", "New York"],
+    "knowsLanguage": ["en", "es"]
+  }
+  </script>
+</head>
+<body class="is-loading">
+  <a class="skip-link" href="#main">Saltar al contenido principal</a>
+
+  <!-- ===== 3D STAGE (decorative; every word on the page is real HTML below) ===== -->
+  <div class="stage" aria-hidden="true">
+    <canvas id="cosmos"></canvas>
+    <div class="stage-fallback"></div>
+    <div class="scrim scrim-left"></div>
+    <div class="scrim scrim-right"></div>
+    <div class="scrim scrim-center"></div>
+    <div class="labels" id="labels"></div>
+  </div>
+
+  <!-- ===== LOADER ===== -->
+  <div class="loader" id="loader" aria-hidden="true">
+    <div class="loader-inner">
+      <svg class="loader-mark" viewBox="0 0 64 44" aria-hidden="true"><use href="#mark"/></svg>
+      <p class="loader-label mono"><span>Trazando las ciudades</span><span class="loader-pct" id="loader-pct">0%</span></p>
+      <div class="loader-bar"><span id="loader-bar"></span></div>
+    </div>
+  </div>
+
+  <!-- ===== HEADER ===== -->
+  <header class="site-header" id="top">
+    <a class="brand" href="#main" aria-label="Inicio de CIIN Co.">
+      <svg class="brand-mark" viewBox="0 0 64 44" aria-hidden="true"><use href="#mark"/></svg>
+      <span class="brand-word">CIIN<span class="brand-dot">·</span>Co</span>
+    </a>
+    <div class="header-end">
+    <nav class="lang-switch" aria-label="Language · Idioma"><a href="../index.html" lang="en" hreflang="en">EN</a><a href="index.html" lang="es" hreflang="es" aria-current="true">ES</a></nav>
+    <nav class="site-nav" aria-label="Principal">
+      <button class="nav-toggle" type="button" aria-expanded="false" aria-controls="nav-list">
+        <span class="nav-toggle-lines" aria-hidden="true"></span><span class="visually-hidden">Menú</span>
+      </button>
+      <ul id="nav-list">
+        <li><a href="#home-port">Oficinas</a></li>
+        <li><a href="#commercial">Comercial</a></li>
+        <li><a href="#residential">Residencial</a></li>
+        <li><a href="#advisory">Asesoría</a></li>
+        <li><a href="#listings">Propiedades</a></li>
+        <li><a class="nav-cta" href="#contact">Contacto</a></li>
+      </ul>
+    </nav>
+    </div>
+  </header>
+
+  <!-- ===== SYSTEM MAP (chapter progress) ===== -->
+  <nav class="system-map" aria-label="Capítulos">
+    <ol>
+      <li><a href="#main" data-chapter="0"><span class="sm-num mono">01</span><span class="sm-name">Nuestras ciudades</span></a></li>
+      <li><a href="#launch" data-chapter="1"><span class="sm-num mono">02</span><span class="sm-name">Horizonte</span></a></li>
+      <li><a href="#commercial" data-chapter="2"><span class="sm-num mono">03</span><span class="sm-name">Comercial</span></a></li>
+      <li><a href="#residential" data-chapter="3"><span class="sm-num mono">04</span><span class="sm-name">Residencial</span></a></li>
+      <li><a href="#advisory" data-chapter="4"><span class="sm-num mono">05</span><span class="sm-name">Asesoría</span></a></li>
+      <li><a href="#record" data-chapter="5"><span class="sm-num mono">06</span><span class="sm-name">Trayectoria</span></a></li>
+      <li><a href="#listings" data-chapter="6"><span class="sm-num mono">07</span><span class="sm-name">Propiedades</span></a></li>
+      <li><a href="#contact" data-chapter="7"><span class="sm-num mono">08</span><span class="sm-name">Contacto</span></a></li>
+    </ol>
+    <span class="sm-track" aria-hidden="true"><span class="sm-fill" id="sm-fill"></span></span>
+  </nav>
+
+  <!-- Previous / next chapter, for visitors who would rather click than scroll -->
+  <nav class="stepper" aria-label="Moverse entre capítulos">
+    <button type="button" class="step-btn" id="step-prev" aria-label="Capítulo anterior"><span aria-hidden="true">↑</span></button>
+    <button type="button" class="step-btn step-next" id="step-next" aria-label="Capítulo siguiente: Horizonte"><span class="step-name mono" id="step-name">Horizonte</span><span aria-hidden="true">↓</span></button>
+  </nav>
+
+  <!-- Map data credit, shown while Google's 3D cities are on screen (required by Google). -->
+  <p class="map-credit" id="map-credit" hidden><span class="mc-logo">Google Maps</span> <span class="mc-data"></span></p>
+
+  <div class="telemetry mono" aria-hidden="true">
+    <span id="tm-sector">01 · Nuestras ciudades</span>
+    <span id="tm-coords">25.6000° N · 80.6000° W</span>
+  </div>
+
+  <div class="cursor" id="cursor" aria-hidden="true"><span class="cursor-ring"></span><span class="cursor-label mono" id="cursor-label"></span></div>
+
+  <main id="main" tabindex="-1">
+
+    <!-- ===== 01 OUR CITIES ===== -->
+    <section class="chapter chapter-left" id="home-port" data-chapter="0" aria-labelledby="home-title">
+      <div class="wrap">
+        <div class="panel">
+          <p class="kicker mono reveal"><span class="kicker-num">01</span> Nuestras ciudades</p>
+          <h2 id="home-title" class="display-2 reveal-lines"><span class="line"><span>Dos ciudades.</span></span><span class="line"><span><em>Una red.</em></span></span></h2>
+          <p class="body reveal">Fundada en 1990, Continental Investments International Network Co. ofrece servicios personalizados de bienes raíces y desarrollo, siempre con el cliente primero. Somos una firma boutique de servicio completo con el trato cercano de una empresa pequeña, comprometida con la experiencia, el apoyo y la integración de servicios que usted necesita para tener éxito.</p>
+          <ul class="offices reveal-stagger">
+            <li class="office" data-office="orlando">
+              <p class="office-coords mono">28.68° N · 81.27° W</p>
+              <h3>Florida</h3>
+              <p class="office-tag">Comercial y residencial</p>
+              <address>1073 Willa Springs Drive, Suite 1005<br>Winter Springs, FL 32708</address>
+              <a class="office-phone" href="tel:+14077395959">407-739-5959</a>
+            </li>
+            <li class="office" data-office="new-york">
+              <p class="office-coords mono">40.75° N · 73.99° W</p>
+              <h3>Nueva York</h3>
+              <p class="office-tag">Comercial</p>
+              <address>276 Fifth Ave., Suite 704-265<br>New York, NY 10001</address>
+              <a class="office-phone" href="tel:+13472486258">347-248-6258</a>
+            </li>
+          </ul>
+          <div class="cta-row reveal">
+            <a class="btn btn-primary" href="#launch">Comenzar el recorrido <span class="btn-arrow" aria-hidden="true">→</span></a>
+            <a class="btn btn-ghost" href="#contact">Hablar con un agente</a>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ===== 02 SKYLINE ===== -->
+    <section class="chapter hero" id="launch" data-chapter="1" aria-labelledby="hero-title">
+      <div class="wrap">
+        <p class="eyebrow mono reveal"><span class="eyebrow-name">Continental Investments International Network Co.</span> <span class="sep" aria-hidden="true">/</span> <span>Desde 1990</span></p>
+        <h1 id="hero-title" class="display reveal-lines">
+          <span class="line"><span>Desde la calle</span></span>
+          <span class="line"><span>hasta el <em>horizonte.</em></span></span>
+        </h1>
+        <p class="lede reveal">Bienes raíces comerciales y residenciales en Florida y Nueva York, de la mano de un equipo boutique que interpreta el mercado desde 1990.</p>
+        <div class="cta-row reveal">
+          <a class="btn btn-primary next-link" href="#commercial"><span class="next-label mono">Siguiente · 03</span> Comercial <span class="btn-arrow" aria-hidden="true">→</span></a>
+          <a class="btn btn-ghost" href="#contact">Hablar con un agente</a>
+        </div>
+      </div>
+      <a class="scroll-cue mono" href="#commercial" aria-hidden="true" tabindex="-1"><span class="scroll-cue-line"></span>Desplácese para explorar</a>
+    </section>
+
+    <!-- ===== 02 COMMERCIAL ===== -->
+    <section class="chapter chapter-left" id="commercial" data-chapter="2" aria-labelledby="commercial-title">
+      <div class="wrap">
+        <div class="panel">
+          <p class="kicker mono reveal"><span class="kicker-num">03</span> Comercial</p>
+          <h2 id="commercial-title" class="display-2 reveal-lines"><span class="line"><span>Propiedades comerciales,</span></span><span class="line"><span><em>trazadas al detalle.</em></span></span></h2>
+          <p class="body reveal">En un mercado complejo y cambiante, los inversionistas necesitan un asesor capaz de anticipar los cambios antes de que afecten una propiedad o una cartera. Ayudamos a nuestros clientes a comprar, vender, arrendar y realizar la debida diligencia de propiedades comerciales, con un enfoque adaptado a cada uno.</p>
+          <ol class="services reveal-stagger">
+            <li><span class="svc-num mono">A</span><div><h3>Compra</h3><p>Encuentre una propiedad comercial que se ajuste a sus planes de negocio o de inversión, con orientación desde la primera búsqueda hasta el cierre.</p></div></li>
+            <li><span class="svc-num mono">B</span><div><h3>Venta</h3><p>Presente su propiedad a compradores calificados y avance del listado al cierre con un plan claro.</p></div></li>
+            <li><span class="svc-num mono">C</span><div><h3>Arrendamiento</h3><p>Encuentre el espacio adecuado para su negocio, o los inquilinos adecuados para su propiedad.</p></div></li>
+            <li><span class="svc-num mono">D</span><div><h3>Debida diligencia</h3><p>Revise la propiedad, los documentos y las cifras antes de comprometerse, para tener menos sorpresas al cierre.</p></div></li>
+          </ol>
+          <div class="types reveal">
+            <p class="types-label mono">Tipos de propiedad que manejamos<span class="gen-only"> · pase el cursor para ubicar uno</span></p>
+            <ul class="chips" id="type-chips">
+              <li>Oficinas</li><li>Comercio minorista</li><li>Industrial</li><li>Multifamiliar</li><li>Hotelería</li><li>Salud</li>
+              <li>Uso mixto</li><li>Desarrollo de terrenos</li><li>Almacenamiento</li><li>Restaurantes</li><li>Iglesias</li><li>Uso especial</li>
+            </ul>
+          </div>
+          <p class="next-row reveal"><a class="btn btn-ghost btn-sm next-link" href="#residential"><span class="next-label mono">Siguiente · 04</span> Residencial <span class="btn-arrow" aria-hidden="true">→</span></a></p>
+        </div>
+      </div>
+    </section>
+
+    <!-- ===== 03 RESIDENTIAL ===== -->
+    <section class="chapter chapter-right" id="residential" data-chapter="3" aria-labelledby="residential-title">
+      <div class="wrap">
+        <div class="panel">
+          <p class="kicker mono reveal"><span class="kicker-num">04</span> Residencial · Florida</p>
+          <h2 id="residential-title" class="display-2 reveal-lines"><span class="line"><span>Encuentre el lugar</span></span><span class="line"><span><em>al que llamará hogar.</em></span></span></h2>
+          <p class="body reveal">Ayudamos a nuestros clientes a comprar, vender y alquilar viviendas y otras propiedades residenciales en todo el centro de Florida, con el mismo cuidado que dedicamos a cada operación comercial.</p>
+          <ol class="services reveal-stagger">
+            <li><span class="svc-num mono">A</span><div><h3>Comprar una vivienda</h3><p>Encuentre una vivienda que se ajuste a sus necesidades y a su presupuesto, con orientación desde la primera visita hasta el cierre.</p></div></li>
+            <li><span class="svc-num mono">B</span><div><h3>Vender una vivienda</h3><p>Presente su vivienda a compradores calificados y avance del listado al cierre con un plan claro.</p></div></li>
+            <li><span class="svc-num mono">C</span><div><h3>Alquilar</h3><p>Encuentre un lugar para alquilar, o los inquilinos adecuados para su vivienda o propiedad en alquiler.</p></div></li>
+            <li><span class="svc-num mono">D</span><div><h3>Debida diligencia</h3><p>Revise la propiedad, los documentos y las cifras antes de comprometerse, para tener menos sorpresas al cierre.</p></div></li>
+          </ol>
+          <a class="agent agent-mini reveal" href="liza-figueroa.html">
+            <picture>
+              <source srcset="../assets/images/liza-figueroa-480.webp" type="image/webp">
+              <img src="../assets/images/liza-figueroa-480.jpg" alt="" width="58" height="58" loading="lazy" decoding="async">
+            </picture>
+            <span>
+              <span class="agent-kicker mono">Su agente en el centro de Florida</span>
+              <span class="agent-name">Liza Figueroa</span>
+              <span class="agent-title mono">REALTOR® · Español e inglés</span>
+            </span>
+            <span class="agent-more" aria-hidden="true">Conozca a Liza →</span>
+          </a>
+          <p class="note reveal">¿Va a comprar o alquilar con nosotros? Lea primero nuestros <a href="../standardized-operating-procedures.html" hreflang="en">Procedimientos Operativos Estandarizados</a> (en inglés). Explican lo que pedimos a cada comprador e inquilino antes de comenzar.</p>
+          <p class="next-row reveal"><a class="btn btn-ghost btn-sm next-link" href="#advisory"><span class="next-label mono">Siguiente · 05</span> Asesoría <span class="btn-arrow" aria-hidden="true">→</span></a></p>
+        </div>
+      </div>
+    </section>
+
+    <!-- ===== 04 ADVISORY ===== -->
+    <section class="chapter chapter-left" id="advisory" data-chapter="4" aria-labelledby="advisory-title">
+      <div class="wrap">
+        <div class="panel panel-wide">
+          <p class="kicker mono reveal"><span class="kicker-num">05</span> Asesoría</p>
+          <h2 id="advisory-title" class="display-2 reveal-lines"><span class="line"><span>Asesoría en cada piso</span></span><span class="line"><span><em>del ciclo de propiedad.</em></span></span></h2>
+          <p class="body reveal">Ofrecemos un conocimiento profundo de los entornos de negocio dinámicos y la capacidad de responder a las condiciones del mercado que pueden afectar una sola propiedad o una cartera completa.<span class="gen-only"> Pase el cursor sobre un servicio para iluminar su piso.</span></p>
+          <ol class="consulting reveal-stagger" id="consulting">
+            <li data-node="0">Análisis de factibilidad</li>
+            <li data-node="1">Modelación detallada de inversiones</li>
+            <li data-node="2">Alternativas de estructura de propiedad</li>
+            <li data-node="3">Estrategias de adquisición y desinversión</li>
+            <li data-node="4">Estudios de mercado y debida diligencia</li>
+            <li data-node="5">Estructuración de deuda y capital</li>
+            <li data-node="6">Evaluación y negociación de financiamiento</li>
+            <li data-node="7">Administración de propiedades</li>
+            <li data-node="8">Gestión de proyectos</li>
+            <li data-node="9">Viviendas para personas mayores</li>
+            <li data-node="10">Vivienda asistida</li>
+            <li data-node="11">Corretaje de negocios</li>
+            <li data-node="12">Fusiones y adquisiciones</li>
+            <li data-node="13">Servicios de diseño y zonificación</li>
+            <li data-node="14">Selección de sitios</li>
+          </ol>
+          <p class="next-row reveal"><a class="btn btn-ghost btn-sm next-link" href="#record"><span class="next-label mono">Siguiente · 06</span> Trayectoria <span class="btn-arrow" aria-hidden="true">→</span></a></p>
+        </div>
+      </div>
+    </section>
+
+    <!-- ===== 05 TRACK RECORD ===== -->
+    <section class="chapter chapter-center" id="record" data-chapter="5" aria-labelledby="record-title">
+      <div class="wrap">
+        <p class="kicker mono reveal"><span class="kicker-num">06</span> Trayectoria</p>
+        <h2 id="record-title" class="display-2 reveal-lines"><span class="line"><span><span class="js-years">36</span> años</span></span><span class="line"><span><em>construyendo relaciones.</em></span></span></h2>
+        <p class="body body-center reveal">Durante los últimos <span class="js-years">36</span> años hemos construido relaciones a largo plazo con un grupo selecto de clientes que confían en nuestra asesoría a lo largo de todo el ciclo de propiedad inmobiliaria.</p>
+        <dl class="stats reveal-stagger">
+          <div class="stat"><dt>En el mercado</dt><dd><span class="stat-num js-years" data-count>36</span><span class="stat-unit">años</span></dd></div>
+          <div class="stat"><dt>Transacciones completadas</dt><dd><span class="stat-pre">$</span><span class="stat-num" data-count>197</span><span class="stat-unit">M+</span></dd></div>
+          <div class="stat"><dt>En desarrollo</dt><dd><span class="stat-pre">$</span><span class="stat-num" data-count>35</span><span class="stat-unit">M</span></dd></div>
+          <div class="stat"><dt>Oficinas · Florida y Nueva York</dt><dd><span class="stat-num" data-count>2</span><span class="stat-unit">oficinas</span></dd></div>
+        </dl>
+        <p class="next-row reveal next-center"><a class="btn btn-ghost btn-sm next-link" href="#listings"><span class="next-label mono">Siguiente · 07</span> Propiedades <span class="btn-arrow" aria-hidden="true">→</span></a></p>
+      </div>
+    </section>
+
+    <!-- ===== 06 LISTINGS ===== -->
+    <section class="chapter chapter-right" id="listings" data-chapter="6" aria-labelledby="listings-title">
+      <div class="wrap">
+        <div class="panel">
+          <p class="kicker mono reveal"><span class="kicker-num">07</span> Propiedades</p>
+          <h2 id="listings-title" class="display-2 reveal-lines"><span class="line"><span>Disponibles</span></span><span class="line"><span><em>ahora mismo.</em></span></span></h2>
+          <p class="body reveal">Nuestras propiedades comerciales se publican en tiempo real en Crexi. Para propiedades residenciales, díganos qué busca y le enviaremos lo que esté disponible.</p>
+          <ul class="listing-links reveal-stagger">
+            <li><a href="https://www.crexi.com/profile/rafael-a-gonzalez-rafaelgonz" target="_blank" rel="noopener">
+              <span class="ll-kicker mono">Comercial · Crexi</span><span class="ll-title">Propiedades en venta y arrendamiento</span><span class="ll-sub">Nuestro perfil completo en Crexi (en inglés), con las transacciones cerradas recientemente</span><span class="ll-arrow" aria-hidden="true">↗</span><span class="visually-hidden">(se abre en una pestaña nueva)</span></a></li>
+            <li><a href="#contact" data-interest="Buying">
+              <span class="ll-kicker mono">Residencial · Florida</span><span class="ll-title">Viviendas en venta o alquiler</span><span class="ll-sub">Contáctenos para conocer las viviendas disponibles</span><span class="ll-arrow" aria-hidden="true">→</span></a></li>
+          </ul>
+          <div class="crexi reveal" id="crexi">
+            <button class="btn btn-ghost btn-sm" type="button" id="crexi-load">Mostrar aquí las propiedades comerciales</button>
+            <p class="crexi-note">Carga el visor de propiedades de crexi.com (en inglés). <a href="https://www.crexi.com/profile/rafael-a-gonzalez-rafaelgonz" target="_blank" rel="noopener">Abrir en Crexi<span class="visually-hidden"> (se abre en una pestaña nueva)</span></a>.</p>
+          </div>
+          <p class="next-row reveal"><a class="btn btn-ghost btn-sm next-link" href="#contact"><span class="next-label mono">Siguiente · 08</span> Contacto <span class="btn-arrow" aria-hidden="true">→</span></a></p>
+        </div>
+      </div>
+    </section>
+
+    <!-- ===== 07 CONTACT ===== -->
+    <section class="chapter chapter-left chapter-contact" id="contact" data-chapter="7" aria-labelledby="contact-title">
+      <div class="wrap contact-grid">
+        <div class="contact-intro">
+          <p class="kicker mono reveal"><span class="kicker-num">08</span> Contacto</p>
+          <h2 id="contact-title" class="display-2 reveal-lines"><span class="line"><span>Hablemos de</span></span><span class="line"><span><em>su próxima propiedad.</em></span></span></h2>
+          <p class="body reveal">Llámenos o escríbanos directamente, o envíenos un mensaje y cuéntenos lo que necesita. Respondemos en un día hábil.</p>
+          <div class="agents reveal">
+          <div class="agent">
+            <picture>
+              <source srcset="../assets/images/rafael-gonzalez-480.webp" type="image/webp">
+              <img src="../assets/images/rafael-gonzalez-480.jpg" alt="Rafael A. Gonzalez" width="96" height="96" loading="lazy" decoding="async">
+            </picture>
+            <div>
+              <p class="agent-name">Rafael A. Gonzalez</p>
+              <p class="agent-title mono">Corredor y CEO</p>
+              <p class="agent-links"><a href="tel:+14077395959">407-739-5959</a><a href="mailto:rafael@ciinco.com">rafael@ciinco.com</a></p>
+            </div>
+          </div>
+          <div class="agent">
+            <picture>
+              <source srcset="../assets/images/liza-figueroa-480.webp" type="image/webp">
+              <img src="../assets/images/liza-figueroa-480.jpg" alt="Liza Figueroa" width="96" height="96" loading="lazy" decoding="async">
+            </picture>
+            <div>
+              <p class="agent-name">Liza Figueroa</p>
+              <p class="agent-title mono">REALTOR® · Español e inglés</p>
+              <p class="agent-links"><a href="tel:+14077395959">407-739-5959</a><a href="liza-figueroa.html">Leer su biografía</a></p>
+            </div>
+          </div>
+          </div>
+          <p class="hours mono reveal">Lunes a viernes · 9:00 a. m. – 5:00 p. m.</p>
+          <p class="next-row reveal"><a class="btn btn-ghost btn-sm next-link" href="#main"><span class="next-label mono">Volver al 01</span> Nuestras ciudades <span class="btn-arrow" aria-hidden="true">↑</span></a></p>
+        </div>
+
+        <!-- Contact form, handled by Netlify Forms once the site is on Netlify (see README). -->
+        <form class="contact-form reveal" id="contact-form" name="contact" action="gracias.html" method="post"
+              data-netlify="true" netlify-honeypot="company_website" novalidate>
+          <input type="hidden" name="form-name" value="contact">
+          <div class="field-row">
+            <div class="field">
+              <label for="f-name">Nombre <span class="req" aria-hidden="true">*</span></label>
+              <input id="f-name" name="name" type="text" autocomplete="name" required maxlength="120">
+              <p class="field-error" id="f-name-err"></p>
+            </div>
+            <div class="field">
+              <label for="f-email">Correo electrónico <span class="req" aria-hidden="true">*</span></label>
+              <input id="f-email" name="email" type="email" autocomplete="email" required maxlength="200">
+              <p class="field-error" id="f-email-err"></p>
+            </div>
+          </div>
+          <div class="field-row">
+            <div class="field">
+              <label for="f-phone">Teléfono <span class="opt">(opcional)</span></label>
+              <input id="f-phone" name="phone" type="tel" autocomplete="tel" maxlength="40">
+            </div>
+            <div class="field">
+              <label for="f-interest">Me interesa</label>
+              <select id="f-interest" name="interest">
+                <option value="Buying">Comprar</option><option value="Selling">Vender</option><option value="Leasing">Arrendar (comercial)</option><option value="Renting">Alquilar (residencial)</option>
+                <option value="Due diligence">Debida diligencia</option><option value="Consulting services">Servicios de consultoría</option><option value="Something else">Otro</option>
+              </select>
+            </div>
+          </div>
+          <fieldset class="field segmented">
+            <legend>Oficina</legend>
+            <label><input type="radio" name="office" value="Florida" checked><span>Florida</span></label>
+            <label><input type="radio" name="office" value="New York"><span>Nueva York</span></label>
+            <label><input type="radio" name="office" value="No preference"><span>Cualquiera</span></label>
+          </fieldset>
+          <div class="field">
+            <label for="f-message">Mensaje <span class="req" aria-hidden="true">*</span></label>
+            <textarea id="f-message" name="message" rows="4" required maxlength="4000"></textarea>
+            <p class="field-error" id="f-message-err"></p>
+          </div>
+          <p class="hp" aria-hidden="true"><label>Deje este campo vacío <input name="company_website" tabindex="-1" autocomplete="off"></label></p>
+          <div class="form-foot">
+            <button class="btn btn-primary" type="submit">Enviar mensaje <span class="btn-arrow" aria-hidden="true">→</span></button>
+            <p class="form-privacy">Los campos marcados con * son obligatorios. Usamos sus datos solo para responderle. <a href="../privacy.html" hreflang="en">Política de privacidad</a> (en inglés)</p>
+          </div>
+          <p class="form-status" role="status" aria-live="polite"></p>
+        </form>
+      </div>
+    </section>
+  </main>
+
+  <!-- ===== FOOTER ===== -->
+  <footer class="site-footer">
+    <div class="wrap footer-grid">
+      <div class="footer-brand">
+        <svg class="brand-mark" viewBox="0 0 64 44" aria-hidden="true"><use href="#mark"/></svg>
+        <p class="footer-legal-name">Continental Investments International Network LLC</p>
+        <p>Florida: bienes raíces comerciales y residenciales · Nueva York: bienes raíces comerciales</p>
+        <p>Rafael A. Gonzalez, corredor de bienes raíces con licencia<br>Licencia de Florida BK3000549 · Licencia de Nueva York 10371201108 (Continental Investments International Network Co.)</p>
+      </div>
+      <div class="footer-eho">
+        <img src="../assets/images/equal-housing-opportunity.png" alt="Igualdad de oportunidades en la vivienda (Equal Housing Opportunity)" width="56" height="56" loading="lazy">
+        <p>Nos comprometemos con la letra y el espíritu de la política de los Estados Unidos para lograr la igualdad de oportunidades en la vivienda en todo el país. Fomentamos y apoyamos un programa afirmativo de publicidad y mercadeo en el que no existan barreras para obtener vivienda por motivos de raza, color, religión, sexo, discapacidad, situación familiar u origen nacional.</p>
+        <p>Cumplimos con todas las leyes federales, estatales y locales de vivienda justa, incluidas la Ley de Vivienda Justa de Florida (Florida Fair Housing Act) y las Leyes de Derechos Humanos del Estado y de la Ciudad de Nueva York. En Nueva York también es ilegal discriminar en materia de vivienda por credo, orientación sexual, identidad o expresión de género, condición militar, edad, estado civil o fuente lícita de ingresos, y la ley de la Ciudad de Nueva York protege características adicionales.</p>
+        <p><a href="https://dos.ny.gov/system/files/documents/2021/03/fairhousingnotice_new.pdf" target="_blank" rel="noopener">Aviso de Vivienda Justa del Estado de Nueva York<span class="visually-hidden"> (PDF en inglés, se abre en una pestaña nueva)</span></a> (en inglés) · <a href="../standardized-operating-procedures.html" hreflang="en">Procedimientos Operativos Estandarizados</a> (en inglés)</p>
+      </div>
+    </div>
+    <div class="wrap footer-base">
+      <p>© <span id="year">2026</span> Continental Investments International Network LLC. Todos los derechos reservados.</p>
+      <p><a href="../privacy.html" hreflang="en">Política de privacidad</a> · <a href="../accessibility.html" hreflang="en">Declaración de accesibilidad</a> (en inglés) · ¿Necesita ayuda para usar este sitio? Llame al <a href="tel:+14077395959">407-739-5959</a></p>
+      <p class="credit">Mapas © colaboradores de <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">OpenStreetMap</a>, <a href="https://openmaptiles.org/" target="_blank" rel="noopener">OpenMapTiles</a> y <a href="https://openfreemap.org/" target="_blank" rel="noopener">OpenFreeMap</a>. Mapa de apertura generado para CIIN Co. con litorales de <a href="https://data.cityofnewyork.us/" target="_blank" rel="noopener">NYC Open Data</a>, límites estatales del Censo de EE. UU. y datos de <a href="https://www.naturalearthdata.com/" target="_blank" rel="noopener">Natural Earth</a> y <a href="https://www.geonames.org/" target="_blank" rel="noopener">GeoNames</a> (<a href="https://creativecommons.org/licenses/by/4.0/" target="_blank" rel="noopener">CC BY 4.0</a>).</p>
+    </div>
+  </footer>
+
+  <!-- Brand mark: the skyline from the CIIN Co. logo, redrawn as a vector. -->
+  <svg class="svg-defs" width="0" height="0" aria-hidden="true">
+    <defs>
+      <linearGradient id="mark-grad" x1="0" y1="0" x2="0" y2="1">
+        <stop offset="0" stop-color="#9cc2ff"/><stop offset="1" stop-color="#447fc1"/>
+      </linearGradient>
+    </defs>
+    <symbol id="mark" viewBox="0 0 64 44"><path fill="url(#mark-grad)" d="M2 24H8V37.70L2 39.89ZM10 16H16V35.53L10 37.07ZM18 8H25V34.13L18 35.13ZM27 2H35V33.86L27 33.97ZM37 11H44V34.77L37 33.97ZM46 19H52V36.50L46 35.13ZM54 27H60V39.10L54 37.07Z"/><path fill="#9aa1ae" transform="matrix(0.09470 0 0 0.09470 -24.2396 5.9786)" d="M 261.253906 381.613281 C 312.257812 356.421875 367.054688 338.375 423.183594 327.195312 C 479.316406 315.707031 536.667969 310.886719 593.882812 310.695312 C 651.089844 310.875 708.484375 315.6875 764.609375 327.179688 C 820.742188 338.3125 875.527344 356.371094 926.53125 381.613281 C 818.792969 344.984375 706.394531 329.515625 593.882812 329.734375 C 481.386719 329.453125 368.9375 344.914062 261.253906 381.613281 Z"/></symbol>
+  </svg>
+
+  <script src="../assets/js/cosmos.js?v=es1" defer></script>
+</body>
+</html>

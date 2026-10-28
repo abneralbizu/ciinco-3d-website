@@ -7,6 +7,7 @@ import { BackSide, Color, Matrix4, Mesh, PerspectiveCamera, Scene, ShaderMateria
 import { DRACOLoader } from 'three/addons/loaders/DRACOLoader.js';
 import { TilesRenderer, WGS84_ELLIPSOID } from '3d-tiles-renderer';
 import { GoogleCloudAuthPlugin, GLTFExtensionsPlugin, TileCompressionPlugin } from '3d-tiles-renderer/plugins';
+import { BASE } from './i18n.js';
 
 const RAD = Math.PI / 180;
 // Keyframe altitudes are metres above the ground the drawn cities stood on; heights in the
@@ -123,7 +124,7 @@ export function createEarth({ key, renderer }) {
 
   const tiles = new TilesRenderer();
   tiles.registerPlugin(new GoogleCloudAuthPlugin({ apiToken: key, autoRefreshToken: true }));
-  const draco = new DRACOLoader().setDecoderPath('assets/draco/');
+  const draco = new DRACOLoader().setDecoderPath(`${BASE}assets/draco/`);
   tiles.registerPlugin(new GLTFExtensionsPlugin({ dracoLoader: draco }));
   tiles.registerPlugin(new TileCompressionPlugin());
   const phone = window.matchMedia('(max-width: 860px)').matches;

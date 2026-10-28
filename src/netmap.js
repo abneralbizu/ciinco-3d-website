@@ -4,6 +4,7 @@
 // districts, property types, neighbourhoods, services and markets each chapter talks about.
 // The 01 "Our cities" opening stays the 3D night map; this layer fades in on the way down.
 import { grid, PLACES } from './geo.js';
+import { t } from './i18n.js';
 
 const TILES = 'https://tiles.openfreemap.org/planet';
 const C = {
@@ -159,7 +160,7 @@ export function createNetMap({ container, services }) {
   const labels = net.nodes.map((f) => {
     const el = document.createElement('div');
     el.className = `nm-label nm-${f.properties.kind}`;
-    el.innerHTML = `<span>${f.properties.label}</span>`;
+    el.innerHTML = `<span>${t(f.properties.label)}</span>`;
     labelRoot.appendChild(el);
     return { f, el, shown: false };
   });

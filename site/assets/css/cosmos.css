@@ -567,3 +567,15 @@ body.netmap-on #labels, body.netmap-on #map-credit { display: none; }
 }
 .agent-mini > span:not(.agent-more) > span { display: block; }
 .doc .bio-facts { padding: 0; margin-left: 0; } .doc .bio-facts li { margin: 0; list-style: none; }
+
+/* ---- Language switch (EN / ES) --------------------------------------------------- */
+.header-end { display: flex; align-items: center; gap: clamp(16px, 2.2vw, 30px); }
+.header-end .lang-switch { order: 2; }
+.lang-switch { display: inline-flex; gap: 2px; padding: 3px; border: 1px solid var(--line-2); border-radius: 999px; background: rgba(3, 4, 10, 0.35); font-family: var(--f-mono); font-size: 0.62rem; letter-spacing: 0.12em; }
+.lang-switch a { min-width: 30px; text-align: center; padding: 5px 8px; border-radius: 999px; color: var(--ink-2); text-decoration: none; transition: color 0.3s, background-color 0.3s; }
+.lang-switch a:hover { color: var(--ink); }
+.lang-switch a[aria-current="true"] { background: var(--ink); color: var(--bg); }
+@media (max-width: 860px) {
+  .header-end .lang-switch { order: 0; }
+  .lang-switch a { padding: 8px 9px; }
+}

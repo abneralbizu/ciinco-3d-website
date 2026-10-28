@@ -1,7 +1,12 @@
-# CIIN Co. 3D website
+# CIIN Co. website
 
-An immersive 3D website for **Continental Investments International Network Co.** Visitors scroll through
-New York and Orlando at dusk. The camera flies between the two cities, and each place is one part of the business:
+The website of **Continental Investments International Network Co.**, in English (site root) and Spanish (`/es/`).
+It opens on a 3D night map of the East Coast (01 Our cities). From there on, each chapter is an interactive
+network map: real streets, shorelines and lakes (OpenStreetMap data through OpenFreeMap, drawn with MapLibre),
+with the two offices as hubs linked to the districts, property types, neighbourhoods, services and markets the
+chapter talks about. Google's photorealistic 3D cities are no longer used (still reachable with `?google`).
+
+The table below describes the earlier all-3D version of the chapters, kept in the code:
 
 | Chapter | Scene | Content |
 |---|---|---|
@@ -34,6 +39,19 @@ Handy preview switches (add to the address):
 - `?p=2` pins the camera on a chapter (0–7), for checking one scene.
 - `?low` forces the light version used on phones and older computers.
 - `?cam=lat,lon,altM,lookLat,lookLon,lookAltM` puts the camera anywhere, for framing new shots.
+- `?google` brings back Google's 3D cities for chapters 02–08 instead of the network maps (needs the API key).
+
+## Two languages
+
+English pages live at the site root, Spanish pages in `site/es/` (`es/index.html`, `es/liza-figueroa.html`,
+`es/gracias.html`). Each page has an EN / ES switch in the header that keeps the visitor on the same chapter.
+The Spanish pages are ordinary copies of the English ones with the text translated and `../` in front of
+`assets/`; `<html lang="es" data-base="../">` tells the scripts to use Spanish map labels and form messages
+(`src/i18n.js`) and where the shared assets are. **When you change the text of an English page, change the
+Spanish page too.** The privacy policy, accessibility statement and Standardized Operating Procedures are in
+English only; the Spanish pages link to them marked "(en inglés)". Have a fluent reviewer read new Spanish text
+before launch, and translate the legal pages only with legal review. When the site has its final domain, change
+the `hreflang` links in the page heads to full addresses (for example `https://ciinco.com/es/`).
 
 ## Folder layout
 
@@ -45,6 +63,8 @@ ciinco-3d-website/
 │   ├── accessibility.html        Accessibility statement
 │   ├── standardized-operating-procedures*.html   SOP chooser + Florida + New York
 │   ├── thanks.html               Shown after the contact form is sent
+│   ├── liza-figueroa.html        Liza Figueroa's bio
+│   ├── es/                       Spanish versions: index.html, liza-figueroa.html, gracias.html
 │   ├── 404.html                  "Page not found"
 │   ├── _headers                  Security + caching headers (Netlify / Cloudflare Pages)
 │   ├── _redirects                /sop short link

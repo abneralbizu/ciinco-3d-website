@@ -1,3 +1,4 @@
+import { t } from './i18n.js';
 // Everything on the page that is not 3D: navigation, reveals, counters,
 // the contact form and the Crexi listings viewer. Works without WebGL.
 
@@ -106,11 +107,11 @@ export function initUI(bus) {
     const i = current();
     if (stepPrev) {
       stepPrev.hidden = i === 0;
-      stepPrev.setAttribute('aria-label', `Previous chapter: ${chapterName(i - 1)}`);
+      stepPrev.setAttribute('aria-label', `${t('Previous chapter')}: ${chapterName(i - 1)}`);
     }
     if (stepNext) {
       stepNext.hidden = i >= chapters.length - 1;
-      stepNext.setAttribute('aria-label', `Next chapter: ${chapterName(i + 1)}`);
+      stepNext.setAttribute('aria-label', `${t('Next chapter')}: ${chapterName(i + 1)}`);
       if (stepName) stepName.textContent = chapterName(i + 1);
     }
   };
@@ -158,6 +159,11 @@ export function initUI(bus) {
   const footer = $('.site-footer');
   new IntersectionObserver(([en]) => document.body.classList.toggle('at-footer', en.isIntersecting), { threshold: 0.05 }).observe(footer);
 
+  // ---- Language switch: stay on the same chapter in the other language ---------
+  $$('.lang-switch a:not([aria-current])').forEach((a) => a.addEventListener('click', () => {
+    if (location.hash) a.href = a.href.split('#')[0] + location.hash;
+  }));
+
   // ---- Crexi listings viewer (loaded only on request) ----------------------
   const crexiBtn = $('#crexi-load');
   if (crexiBtn) {
@@ -165,7 +171,7 @@ export function initUI(bus) {
       const f = document.createElement('iframe');
       f.className = 'crexi-frame';
       f.src = 'https://www.crexi.com/widgets/1594';
-      f.title = 'CIIN Co. commercial listings on Crexi';
+      f.title = t('CIIN Co. commercial listings on Crexi');
       f.loading = 'lazy';
       f.referrerPolicy = 'strict-origin-when-cross-origin';
       crexiBtn.replaceWith(f);
@@ -177,9 +183,9 @@ export function initUI(bus) {
   if (form) {
     const status = $('.form-status', form);
     const rules = [
-      ['f-name', (v) => v.trim().length > 1, 'Please enter your name.'],
-      ['f-email', (v) => /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(v.trim()), 'Please enter a valid email address.'],
-      ['f-message', (v) => v.trim().length > 4, 'Please tell us a little about what you need.'],
+      ['f-name', (v) => v.trim().length > 1, t('Please enter your name.')],
+      ['f-email', (v) => /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(v.trim()), t('Please enter a valid email address.')],
+      ['f-message', (v) => v.trim().length > 4, t('Please tell us a little about what you need.')],
     ];
     const check = (id, ok, msg) => {
       const el = $(`#${id}`, form);
@@ -199,13 +205,13 @@ export function initUI(bus) {
         const first = rules[results.indexOf(false)][0];
         $(`#${first}`, form).focus();
         status.classList.add('is-error');
-        status.textContent = 'Please check the highlighted fields.';
+        status.textContent = t('Please check the highlighted fields.');
         return;
       }
       if (form.company_website.value) return; // spam trap
       const btn = form.querySelector('button[type="submit"]');
       btn.disabled = true;
-      status.textContent = 'Sending…';
+      status.textContent = t('Sending…');
       try {
         const res = await fetch('/', {
           method: 'POST',
@@ -217,7 +223,7 @@ export function initUI(bus) {
       } catch (err) {
         btn.disabled = false;
         status.classList.add('is-error');
-        status.innerHTML = 'Your message could not be sent. Please email <a href="mailto:rafael@ciinco.com">rafael@ciinco.com</a> or call <a href="tel:+14077395959">407-739-5959</a>.';
+        status.innerHTML = `${t('Your message could not be sent. Please email')} <a href="mailto:rafael@ciinco.com">rafael@ciinco.com</a> ${t('or call')} <a href="tel:+14077395959">407-739-5959</a>.`;
       }
     });
   }
