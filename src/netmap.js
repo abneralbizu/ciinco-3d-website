@@ -190,33 +190,94 @@ export function createNetMap({ container, services }) {
     { keys: ['hub-ny', 'hub-fl'], b: 0, behind: true },
   ];
   const chapterEls = Array.from(document.querySelectorAll('.chapter'));
-  const textEl = (ch) => ch && (ch.querySelector('.panel') || ch.querySelector('.contact-intro') || ch.querySelector('.wrap'));
+  // The pieces of text a chapter shows (headline lines, paragraphs, lists, buttons, cards).
+  const TEXT = '.kicker, .eyebrow, h1 .line > span, h2 .line > span, .lede, .body, .note, .services, .types, .consulting, '
+    + '.stats, .listing-links, .crexi, .cta-row, .next-row, .offices, .agent-mini, .agents, .hours, .contact-form, .scroll-cue';
+  const textParts = (ch) => (ch ? Array.from(ch.querySelectorAll(TEXT)) : []);
+  // Where a chapter's text sits on screen once the page has scrolled to that chapter
+  function textRects(i, live = false) {
+    const ch = chapterEls[i];
+    if (!ch) return [];
+    let shift = 0;
+    if (!live) {
+      const vh = window.innerHeight, max = document.documentElement.scrollHeight - vh;
+      const r = ch.getBoundingClientRect();
+      const anchor = i === 0 ? 0 : Math.min(max, Math.max(0, r.top + window.scrollY + r.height / 2 - vh / 2));
+      shift = window.scrollY - anchor;
+    }
+    // measure the text where it ends up, not mid-way through its reveal animation
+    if (!live) document.documentElement.classList.add('nm-measure');
+    const range = document.createRange();
+    const out = textParts(ch).map((el) => { range.selectNodeContents(el); return range.getBoundingClientRect(); })   // the words, not the full-width box
+      .filter((r) => r.width > 2 && r.height > 2)
+      .map((r) => ({ l: r.left, t: r.top + shift, r: r.right, b: r.bottom + shift }));
+    if (!live) document.documentElement.classList.remove('nm-measure');
+    return out;
+  }
+  // The largest clear rectangle of the screen: not under the text, the header, the chapter
+  // list or the corner buttons. The chapter's network is fitted into it.
+  function freeRect(rects, W, H, aspect = 1) {
+    const C = 40, Rn = 26, cw = W / C, rh = H / Rn;
+    const wide = W > 860;
+    const blocked = (x0, y0, x1, y1) => {
+      if (y0 < 84 || y1 > H - 64) return true;
+      if (wide && x1 > W - 200) return true;               // chapter list and step buttons
+      return rects.some((q) => x1 > q.l - 28 && x0 < q.r + 28 && y1 > q.t - 22 && y0 < q.b + 22);
+    };
+    const hgt = new Array(C).fill(0);
+    let best = null;
+    for (let y = 0; y < Rn; y++) {
+      for (let x = 0; x < C; x++) hgt[x] = blocked(x * cw, y * rh, (x + 1) * cw, (y + 1) * rh) ? 0 : hgt[x] + 1;
+      // largest rectangle under this row's histogram
+      const st = [];
+      for (let x = 0; x <= C; x++) {
+        const h = x < C ? hgt[x] : 0;
+        while (st.length && hgt[st[st.length - 1]] >= h) {
+          const top = st.pop();
+          const hh = hgt[top]; if (!hh) continue;
+          const left = st.length ? st[st.length - 1] + 1 : 0;
+          const w = (x - left) * cw, hp = hh * rh;
+          // how big the network would be drawn in this rectangle (its own shape decides)
+          const score = Math.min(w, hp * aspect);
+          if (!best || score > best.score * 1.03 || (score > best.score * 0.97 && w * hp > best.area)) best = { score, area: w * hp, x: left * cw, y: (y - hh + 1) * rh, w, h: hp };
+        }
+        st.push(x);
+      }
+    }
+    return best;
+  }
+  if (/[?&]debug\b/.test(location.search)) window.__nm = { textRects, freeRect, frames: () => frames };   // for checking the framing
   let frames = null;
   function computeFrames() {
     const W = window.innerWidth, H = window.innerHeight;
-    const head = 90, foot = 70, gap = 48;
+    const merc = (c) => maplibregl.MercatorCoordinate.fromLngLat(c);
     frames = FRAME.map((F, i) => {
       if (!F.keys) return VIEWS[0];
       const pts = net.nodes.filter((n) => F.keys.some((k) => n.properties.key === k || (k.length === 1 && n.properties.key.startsWith(k) && /\d/.test(n.properties.key[1])))).map((n) => n.geometry.coordinates);
       const lons = pts.map((q) => q[0]), lats = pts.map((q) => q[1]);
       const bounds = [[Math.min(...lons), Math.min(...lats)], [Math.max(...lons), Math.max(...lats)]];
-      const r = textEl(chapterEls[i]) ? textEl(chapterEls[i]).getBoundingClientRect() : null;
-      let pad = { top: head, bottom: foot, left: 60, right: 60 };
-      const leftText = r && r.left + r.width / 2 < W / 2;
-      const free = !r ? W : leftText ? W - r.right : r.left;      // width of the space beside the text
-      const wide = !r || free < 300 || W / H < 0.9 || F.behind;
-      if (!wide) {
-        if (leftText) pad.left = r.right + gap; else pad.right = W - r.left + gap;
+      let pad = { top: 110, bottom: 90, left: 80, right: W > 860 ? 240 : 60 };   // behind the text, whole screen
+      // the network's shape on screen (width / height), after turning the map to its bearing
+      const rot = (F.b * Math.PI) / 180;
+      const mp = pts.map((q) => { const m = merc(q); return [m.x * Math.cos(rot) - m.y * Math.sin(rot), m.x * Math.sin(rot) + m.y * Math.cos(rot)]; });
+      const bw = Math.max(...mp.map((q) => q[0])) - Math.min(...mp.map((q) => q[0]));
+      const bh = Math.max(...mp.map((q) => q[1])) - Math.min(...mp.map((q) => q[1]));
+      const aspect = Math.min(4, Math.max(0.25, (bw + 1e-9) / (bh + 1e-9)));
+      const fr = F.behind ? null : freeRect(textRects(i), W, H, aspect);
+      if (fr && fr.w > 200 && fr.h >= 120 && fr.score > Math.min(W, H) * 0.26) {
+        // inside the clear area, leaving a little room for the names beside the dots
+        const ix = Math.min(90, fr.w * 0.14), iy = Math.min(30, fr.h * 0.08);
+        pad = { left: fr.x + ix, right: W - (fr.x + fr.w) + ix, top: fr.y + iy, bottom: H - (fr.y + fr.h) + iy };
       }
-      if (W / H < 0.9) pad = { top: 80, bottom: H * 0.62, left: 28, right: 28 };   // phones: in the open space above the text card
       const cam = map.cameraForBounds(bounds, { padding: pad, bearing: F.b, maxZoom: 14 });
       if (!cam) return VIEWS[i];
       const c = cam.center.toArray ? cam.center.toArray() : [cam.center.lng, cam.center.lat];
       return { c, z: cam.zoom, b: F.b };
     });
   }
-  window.addEventListener('resize', () => { frames = null; });
-  if (document.fonts) document.fonts.ready.then(() => { frames = null; });
+  window.addEventListener('resize', () => { frames = null; labels.forEach((L) => { L.w = 0; }); });
+  if (document.fonts) document.fonts.ready.then(() => { frames = null; labels.forEach((L) => { L.w = 0; }); });
+  window.addEventListener('load', () => { frames = null; });
 
   // view along the scroll: glide between chapters; between the two cities, rise high enough to see both
   const merc = (c) => maplibregl.MercatorCoordinate.fromLngLat(c);
@@ -295,22 +356,42 @@ export function createNetMap({ container, services }) {
         if (h) hover = net.nodes.find((n) => n.id === h.id) || null;
       }
 
-      // labels: never under the current chapter's text
-      const cur = textEl(chapterEls[Math.round(p)]);
-      const tr = cur ? cur.getBoundingClientRect() : null;
-      for (const L of labels) {
+      // labels: never under the chapter's text, never on top of each other. The offices come
+      // first, then whatever is lit up; each name goes right of its dot, or left if that is taken.
+      const rects = textRects(Math.round(p), true);
+      document.querySelectorAll('.system-map, .stepper, .telemetry').forEach((el) => {
+        const r = el.getBoundingClientRect();
+        if (r.width > 2) rects.push({ l: r.left, t: r.top, r: r.right, b: r.bottom });
+      });
+      const placed = [];
+      const clear = (b) => b.l > 8 && b.r < W - 8 && b.t > 76 && b.b < H - 40
+        && !rects.some((q) => b.r > q.l - 10 && b.l < q.r + 10 && b.b > q.t - 6 && b.t < q.b + 6)
+        && !placed.some((q) => b.r > q.l - 6 && b.l < q.r + 6 && b.b > q.t - 3 && b.t < q.b + 3);
+      const order = labels.slice().sort((a, b) => (b.f.properties.kind === 'hub') - (a.f.properties.kind === 'hub') || (!!b.f._hot) - (!!a.f._hot));
+      for (const L of order) {
         const pr = L.f.properties;
         const quiet = pr.quiet && !L.f._hot;
-        const show = L.f._w > 0.55 && mix > 0.6 && !quiet;
-        if (show) {
+        let on = false;
+        if (L.f._w > 0.55 && mix > 0.6 && !quiet) {
           const s = map.project(L.f.geometry.coordinates);
-          const under = tr && s.x > tr.left - 30 && s.x < tr.right + 10 && s.y > tr.top - 14 && s.y < tr.bottom + 14;
-          const onScreen = s.x > 10 && s.x < W - 10 && s.y > 70 && s.y < H - 30 && !under;
-          L.el.classList.toggle('is-left', s.x > W * 0.72);   // near the right edge: name to the left of the dot
-          L.el.style.transform = `translate3d(${s.x.toFixed(1)}px, ${s.y.toFixed(1)}px, 0)`;
-          L.el.classList.toggle('is-on', onScreen);
-          L.el.classList.toggle('is-hot', !!L.f._hot);
-        } else if (L.el.classList.contains('is-on')) L.el.classList.remove('is-on');
+          if (!L.w) { const r = L.el.firstElementChild.getBoundingClientRect(); L.w = r.width; L.h = r.height; }
+          const gap = pr.kind === 'hub' ? 16 : 12, hh = L.h / 2 + 2;
+          const right = { l: s.x + gap, r: s.x + gap + L.w, t: s.y - hh, b: s.y + hh };
+          const left = { l: s.x - gap - L.w, r: s.x - gap, t: s.y - hh, b: s.y + hh };
+          const below = { l: s.x - L.w / 2, r: s.x + L.w / 2, t: s.y + 10, b: s.y + 10 + L.h };
+          const above = { l: s.x - L.w / 2, r: s.x + L.w / 2, t: s.y - 10 - L.h, b: s.y - 10 };
+          const box = [right, left, below, above].find(clear) || null;
+          if (box) {
+            placed.push(box);
+            on = true;
+            L.el.classList.toggle('is-left', box === left);
+            L.el.classList.toggle('is-below', box === below);
+            L.el.classList.toggle('is-above', box === above);
+            L.el.style.transform = `translate3d(${s.x.toFixed(1)}px, ${s.y.toFixed(1)}px, 0)`;
+            L.el.classList.toggle('is-hot', !!L.f._hot);
+          }
+        }
+        if (on !== L.el.classList.contains('is-on')) L.el.classList.toggle('is-on', on);
       }
       lastP = p;
       return v;
