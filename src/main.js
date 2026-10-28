@@ -406,9 +406,6 @@ async function boot() {
     world.fog.detail.value = 1 - smooth(140, 700, alt);
     world.clouds.uniforms.uOpacity.value = 0.42 * smooth(110, 600, alt) * (1 - smooth(25000, 40000, alt)) + 0.5 * frame.flight * smooth(60, 200, alt);
     world.map.uniforms.uLights.value = 0.6 + 0.6 * smooth(50, 3000, alt);
-    // major cities switch on in a wave once the page has loaded; only from high up
-    if (started) world.metros.ignite.value = Math.min(1, world.metros.ignite.value + dt / (reducedMotion.matches ? 0.01 : 3.2));
-    world.metros.on.value = smooth(1500, 6000, alt);
 
     // offices: beams and rings that stay readable from street level to orbit
     world.offices.forEach((o) => {

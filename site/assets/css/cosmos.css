@@ -97,8 +97,8 @@ main:focus { outline: none; }
 /* Edge shading so text always has something dark under it. */
 /* Shade behind whichever side holds the text, so it reads over a lit city. */
 .scrim { position: absolute; inset: 0; pointer-events: none; opacity: 0; transition: opacity 0.9s var(--ease-io); }
-.scrim-left { background: linear-gradient(90deg, rgba(3, 4, 10, 0.86) 0%, rgba(3, 4, 10, 0.72) 30%, rgba(3, 4, 10, 0.32) 50%, rgba(3, 4, 10, 0) 66%); }
-.scrim-right { background: linear-gradient(270deg, rgba(3, 4, 10, 0.86) 0%, rgba(3, 4, 10, 0.72) 30%, rgba(3, 4, 10, 0.32) 50%, rgba(3, 4, 10, 0) 66%); }
+.scrim-left { background: linear-gradient(90deg, rgba(3, 4, 10, 0.42) 0%, rgba(3, 4, 10, 0.5) 30%, rgba(3, 4, 10, 0.22) 50%, rgba(3, 4, 10, 0) 66%); }
+.scrim-right { background: linear-gradient(270deg, rgba(3, 4, 10, 0.42) 0%, rgba(3, 4, 10, 0.5) 30%, rgba(3, 4, 10, 0.22) 50%, rgba(3, 4, 10, 0) 66%); }
 .scrim-center { background: radial-gradient(ellipse 62% 58% at 50% 50%, rgba(3, 4, 10, 0.78), rgba(3, 4, 10, 0.45) 55%, rgba(3, 4, 10, 0) 85%); }
 body[data-side="left"] .scrim-left, body[data-side="right"] .scrim-right, body[data-side="center"] .scrim-center { opacity: 1; }
 @media (max-width: 860px) {

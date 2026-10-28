@@ -1,7 +1,7 @@
 // Exports the raw geography used by tools/build_geo.py:
 //   data/land10.geojson    coastlines (Natural Earth 1:10m, public domain, via world-atlas)
 //   data/states.geojson    US state borders (US Census, via us-atlas)
-//   data/region-cities.json  populated places on the East Coast (GeoNames CC BY 4.0, via all-the-cities)
+//   data/region-cities.json  populated places across North America (the night map's extent) (GeoNames CC BY 4.0, via all-the-cities)
 // Run from the project root: node tools/export-geo.mjs
 import { readFileSync, writeFileSync, mkdirSync } from 'node:fs';
 import { createRequire } from 'node:module';
@@ -20,7 +20,7 @@ writeFileSync('data/states.geojson', JSON.stringify(borders));
 const cities = require('all-the-cities')
   .filter((c) => {
     const [lon, lat] = c.loc.coordinates;
-    return lon > -90 && lon < -64 && lat > 23 && lat < 46 && c.population >= 500;
+    return lon > -129 && lon < -51 && lat > 15 && lat < 53 && c.population >= 500;
   })
   .map((c) => [+c.loc.coordinates[0].toFixed(4), +c.loc.coordinates[1].toFixed(4), c.population]);
 writeFileSync('data/region-cities.json', JSON.stringify(cities));

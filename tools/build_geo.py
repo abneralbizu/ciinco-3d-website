@@ -27,8 +27,10 @@ OUT_TEX = os.path.join("site", "assets", "textures")
 os.makedirs(OUT_DATA, exist_ok=True)
 os.makedirs(OUT_TEX, exist_ok=True)
 
-# Map extent (degrees). Mercator, so shapes stay true at every latitude.
-LON_MIN, LON_MAX, LAT_MIN, LAT_MAX = -97.0, -60.0, 22.0, 47.5
+# Map extent (degrees). Mercator, so shapes stay true at every latitude. The whole of the
+# lower 48, southern Canada, northern Mexico and the Caribbean, so the night map fills the
+# screen at any window shape.
+LON_MIN, LON_MAX, LAT_MIN, LAT_MAX = -128.0, -52.0, 16.0, 52.0
 
 
 def merc(lat):
@@ -102,7 +104,7 @@ def nyc():
 # ---------------------------------------------------------------------------
 # East Coast night map
 # ---------------------------------------------------------------------------
-def night_map(W=4096):
+def night_map(W=8192):
     lon_span = math.radians(LON_MAX - LON_MIN)
     m_top, m_bot = merc(LAT_MAX), merc(LAT_MIN)
     H = int(round(W * (m_top - m_bot) / lon_span))
@@ -170,5 +172,7 @@ def night_map(W=4096):
 
 
 if __name__ == "__main__":
-    nyc()
+    import sys
+    if "--map-only" not in sys.argv:
+        nyc()
     night_map()
