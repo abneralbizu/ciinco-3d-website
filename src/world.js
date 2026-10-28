@@ -5,7 +5,7 @@ import {
   AdditiveBlending, BackSide, BoxGeometry, BufferAttribute, BufferGeometry, Color, CylinderGeometry, DoubleSide,
   Float32BufferAttribute, Group, IcosahedronGeometry, InstancedBufferAttribute, InstancedMesh, Matrix4, Mesh,
   LineSegments, MeshBasicMaterial, Object3D, PlaneGeometry, Points, Quaternion, RingGeometry, ShaderMaterial,
-  Shape, ShapeGeometry, SphereGeometry, TubeGeometry, ExtrudeGeometry, CatmullRomCurve3, Vector2, Vector3,
+  Shape, ShapeGeometry, SphereGeometry, TubeGeometry, Uniform, ExtrudeGeometry, CatmullRomCurve3, Vector2, Vector3,
 } from 'three';
 import * as S from './shaders.js';
 import { t as tr } from './i18n.js';
@@ -271,6 +271,54 @@ export function buildWorld(scene, tex, data, quality) {
     mesh.frustumCulled = false;
     scene.add(mesh);
     world.map = m;
+  }
+
+  // ---- Major metro areas: brighter clusters that light up in a wave from our offices -------
+  {
+    // [lat, lon, metro population in millions]
+    const METROS = [
+      [40.71, -74.01, 19.5], [41.88, -87.63, 9.4], [38.90, -77.04, 6.3], [39.95, -75.17, 6.2], [25.76, -80.19, 6.1],
+      [33.75, -84.39, 6.2], [42.36, -71.06, 4.9], [42.33, -83.05, 4.3], [43.65, -79.38, 6.2], [45.50, -73.57, 4.3],
+      [29.76, -95.37, 7.1], [32.78, -96.80, 7.6], [27.95, -82.46, 3.3], [44.98, -93.27, 3.7], [38.63, -90.20, 2.8],
+      [39.29, -76.61, 2.8], [35.23, -80.84, 2.7], [28.54, -81.38, 2.7], [40.44, -80.00, 2.4], [39.10, -84.51, 2.3],
+      [41.50, -81.69, 2.1], [39.96, -83.00, 2.1], [39.77, -86.16, 2.1], [36.16, -86.78, 2.0], [36.85, -75.98, 1.8],
+      [30.33, -81.66, 1.7], [41.82, -71.41, 1.7], [35.78, -78.64, 1.5], [43.04, -87.91, 1.6], [35.15, -90.05, 1.3],
+      [38.25, -85.76, 1.3], [37.54, -77.44, 1.3], [29.95, -90.07, 1.0], [33.52, -86.80, 1.1], [42.89, -78.88, 1.2],
+      [41.76, -72.67, 1.2], [26.12, -80.14, 1.9], [26.64, -81.87, 0.8], [32.78, -79.93, 0.8], [34.85, -82.39, 0.9],
+      [27.34, -82.53, 0.8], [30.44, -84.28, 0.4], [32.08, -81.09, 0.4], [43.16, -77.61, 1.1], [42.65, -73.76, 0.9],
+      [35.96, -83.92, 0.9], [36.07, -79.79, 0.8], [29.42, -98.49, 2.6], [30.27, -97.74, 2.4], [35.47, -97.52, 1.4],
+      [23.11, -82.37, 2.1],
+    ];
+    const b = data.map;
+    const inMap = METROS.filter(([la, lo]) => lo > b.lonMin && lo < b.lonMax && la > b.latMin && la < b.latMax);
+    const geo = new PlaneGeometry(2, 2);
+    geo.rotateX(-Math.PI / 2);
+    const n = inMap.length;
+    const power = new Float32Array(n), delay = new Float32Array(n), seed = new Float32Array(n);
+    const offices = [[PLACES.nyOffice.lat, PLACES.nyOffice.lon], [PLACES.orlandoOffice.lat, PLACES.orlandoOffice.lon]];
+    const dist = inMap.map(([la, lo]) => Math.min(...offices.map(([a, o]) => Math.hypot(la - a, (lo - o) * Math.cos(la * Math.PI / 180)))));
+    const dMax = Math.max(...dist);
+    const um = new Uniform(0), uo = new Uniform(1);
+    const gm = mat(S.metroGlow, { uTime, uIgnite: um, uOn: uo }, additive);
+    const mesh = new InstancedMesh(geo, gm, n);
+    const mtx = new Matrix4();
+    inMap.forEach(([la, lo, pop], i) => {
+      const v = P(la, lo);
+      const rKm = 22 + 26 * Math.sqrt(pop);            // a bigger metro spreads wider
+      const s = rKm * 10 * k(la);                      // scene units (100 m at the equator)
+      mtx.makeScale(s, 1, s).setPosition(v.x, -0.52, v.z);
+      mesh.setMatrixAt(i, mtx);
+      power[i] = 0.35 + 0.65 * Math.min(1, Math.sqrt(pop / 7));
+      delay[i] = 0.08 + 0.72 * (dist[i] / dMax);       // a wave outward from New York and Winter Springs
+      seed[i] = (i * 0.618) % 1;
+    });
+    geo.setAttribute('aPower', new InstancedBufferAttribute(power, 1));
+    geo.setAttribute('aDelay', new InstancedBufferAttribute(delay, 1));
+    geo.setAttribute('aSeed', new InstancedBufferAttribute(seed, 1));
+    mesh.renderOrder = -9;
+    mesh.frustumCulled = false;
+    scene.add(mesh);
+    world.metros = { ignite: um, on: uo };
   }
 
   // =========================================================================

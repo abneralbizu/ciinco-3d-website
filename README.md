@@ -4,7 +4,7 @@ The website of **Continental Investments International Network Co.**, in English
 It opens on a 3D night map of the East Coast (01 Our cities). From there on, each chapter is an interactive
 network map: real streets, shorelines and lakes (OpenStreetMap data through OpenFreeMap, drawn with MapLibre),
 with the two offices as hubs linked to the districts, property types, neighbourhoods, services and markets the
-chapter talks about. Google's photorealistic 3D cities are no longer used (still reachable with `?google`).
+chapter talks about. The site uses nothing from Google.
 
 The table below describes the earlier all-3D version of the chapters, kept in the code:
 
@@ -39,7 +39,7 @@ Handy preview switches (add to the address):
 - `?p=2` pins the camera on a chapter (0–7), for checking one scene.
 - `?low` forces the light version used on phones and older computers.
 - `?cam=lat,lon,altM,lookLat,lookLon,lookAltM` puts the camera anywhere, for framing new shots.
-- `?google` brings back Google's 3D cities for chapters 02–08 instead of the network maps (needs the API key).
+- `?drawn` shows the older all-3D chapters instead of the network maps.
 
 ## Two languages
 

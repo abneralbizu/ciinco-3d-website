@@ -41,17 +41,6 @@ jobs:
           # Netlify-only files have no effect on GitHub Pages.
           rm -f _preview/_headers _preview/_redirects
 
-      - name: Add the Google Maps key (repository secret GOOGLE_MAPS_KEY)
-        env:
-          GMAPS_KEY: ${{ secrets.GOOGLE_MAPS_KEY }}
-        run: |
-          if [ -n "$GMAPS_KEY" ]; then
-            sed -i "s#<meta name=\"gmaps-key\" content=\"\">#<meta name=\"gmaps-key\" content=\"$GMAPS_KEY\">#" _preview/index.html
-            grep -q 'name="gmaps-key" content=""' _preview/index.html && { echo "key not inserted"; exit 1; } || echo "key inserted"
-          else
-            echo "No GOOGLE_MAPS_KEY secret: the generated cities are used."
-          fi
-
       - uses: actions/configure-pages@v5
       - uses: actions/upload-pages-artifact@v4
         with:

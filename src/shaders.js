@@ -1109,41 +1109,50 @@ export const finalPass = {
 };
 
 // ---------------------------------------------------------------------------
-// Photographed cities (Google Photorealistic 3D Tiles): the daylight photo texture,
-// graded toward golden hour so it sits with the rest of the site, hazed with distance
-// and faded out at the edge of the city and high up.
+// Major metro areas on the night map: a warm cluster of lights per city (brighter and wider
+// for bigger cities) that switches on in a wave from the two offices when the page opens.
 // ---------------------------------------------------------------------------
-export const tiles = {
+export const metroGlow = {
   vertexShader: /* glsl */ `
+    attribute float aPower;
+    attribute float aDelay;
+    attribute float aSeed;
     varying vec2 vUv;
-    varying vec3 vP;
+    varying float vPower;
+    varying float vDelay;
+    varying float vSeed;
     void main() {
-      vUv = uv;
-      vec4 wp = modelMatrix * vec4(position, 1.0);
-      vP = wp.xyz;
-      gl_Position = projectionMatrix * viewMatrix * wp;
+      vUv = uv; vPower = aPower; vDelay = aDelay; vSeed = aSeed;
+      gl_Position = projectionMatrix * modelViewMatrix * instanceMatrix * vec4(position, 1.0);
     }
   `,
   fragmentShader: /* glsl */ `
-    uniform sampler2D map;
-    uniform float uFade;
-    uniform float uExposure;
-    uniform float uSat;
-    ${FOG}
+    uniform float uTime;
+    uniform float uIgnite;   // 0 -> 1 as the cities switch on
+    uniform float uOn;       // fades the layer out close to the ground
     varying vec2 vUv;
-    varying vec3 vP;
+    varying float vPower;
+    varying float vDelay;
+    varying float vSeed;
+    float h12(vec2 p) { return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }
     void main() {
-      // The photo already carries its own sunlight and shadows: no relighting (per-triangle
-      // shading made the photogrammetry mesh look shattered), only a gentle colour grade.
-      vec3 c = texture2D(map, vUv).rgb;
-      vec3 V = normalize(cameraPosition - vP);
-      float lum = dot(c, vec3(0.2126, 0.7152, 0.0722));
-      vec3 g = max(mix(vec3(lum), c, uSat), 0.0) * uExposure;
-      // late-afternoon split tone: shade a touch cooler, light a touch warmer
-      g *= mix(vec3(0.94, 0.97, 1.04), vec3(1.05, 1.0, 0.94), smoothstep(0.04, 0.5, lum));
-      vec3 col = applyFog(g, vP);
-      col = mix(hazeColor(-V), col, uFade);
-      gl_FragColor = vec4(col, 1.0);
+      vec2 p = vUv * 2.0 - 1.0;
+      float r = length(p);
+      if (r > 1.0) discard;
+      // the city: a dense bright core, suburbs thinning out, a soft halo over it all
+      float core = exp(-r * r * 16.0);
+      float halo = exp(-r * r * 5.0) * 0.32;
+      vec2 q = p * 11.0 + vSeed * 17.0;
+      vec2 c = floor(q), f = fract(q) - 0.5;
+      float n = h12(c);
+      float dot1 = step(0.55 - 0.35 * exp(-r * r * 4.0), n) * smoothstep(0.32, 0.0, length(f)) * exp(-r * r * 3.0);
+      float spark = 0.7 + 0.3 * sin(uTime * (1.2 + n * 2.0) + n * 40.0);
+      float on = smoothstep(vDelay, vDelay + 0.12, uIgnite);
+      float flash = exp(-pow((uIgnite - vDelay - 0.06) * 14.0, 2.0)) * (1.0 - step(0.999, uIgnite));
+      float a = (core * 2.6 + halo * 1.6 + dot1 * spark * 1.6) * vPower * (on + flash * 0.8) * uOn;
+      a *= 1.0 - smoothstep(0.8, 1.0, r);
+      vec3 col = mix(vec3(1.0, 0.62, 0.32), vec3(1.0, 0.9, 0.72), core);
+      gl_FragColor = vec4(col * a, 1.0);
     }
   `,
 };

@@ -1,6 +1,6 @@
 // CIIN Co. 3D: entry point.
 import {
-  ACESFilmicToneMapping, NoToneMapping, Clock, Color, ClampToEdgeWrapping, RepeatWrapping, HalfFloatType, LinearMipmapLinearFilter, LoadingManager, Matrix4,
+  ACESFilmicToneMapping, Clock, Color, ClampToEdgeWrapping, RepeatWrapping, HalfFloatType, LinearMipmapLinearFilter, LoadingManager, Matrix4,
   NoColorSpace, PerspectiveCamera, Ray, Scene, ShaderMaterial, SRGBColorSpace, TextureLoader, Vector2, Vector3,
   WebGLRenderer, WebGLRenderTarget, Plane, Vector4,
 } from 'three';
@@ -9,12 +9,10 @@ import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
 import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
 import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
 import { ShaderPass } from 'three/addons/postprocessing/ShaderPass.js';
-import { Pass, FullScreenQuad } from 'three/addons/postprocessing/Pass.js';
 import { buildWorld } from './world.js';
-import { createEarth } from './earth.js';
 import { createNetMap } from './netmap.js';
 import { t as tr, BASE } from './i18n.js';
-import { sampleJourney, sampleJourneyGeo, CHAPTERS } from './journey.js';
+import { sampleJourney, CHAPTERS } from './journey.js';
 import { unproject, altitudeM, P } from './geo.js';
 import { initUI, setLoader, finishLoading, reducedMotion } from './ui.js';
 import { finalPass, sanitizePass } from './shaders.js';
@@ -30,8 +28,8 @@ function webglOK() {
 }
 const shortSide = Math.min(screen.width, screen.height);
 const quality = {
-  night: params.has('night'),   // preview: night-flight chapters, no Google
-  maps: !params.has('google'),  // network maps for chapters 02-08 (Google's 3D only with ?google)
+  night: params.has('night'),   // preview: night-flight chapters
+  maps: !params.has('drawn'),   // network maps for chapters 02-08 (?drawn shows the older all-3D chapters)
   low: params.has('low') || shortSide < 700 || (navigator.hardwareConcurrency || 8) <= 4 || (navigator.deviceMemory || 8) <= 4,
 };
 const maxDPR = quality.low ? 1.5 : 1.75;
@@ -65,52 +63,6 @@ function startScrollOnly() {
   window.addEventListener('resize', computeAnchors);
   const tick = () => { const p = progressFromScroll(); bus.setProgress(p, Math.round(p), null); requestAnimationFrame(tick); };
   tick();
-}
-
-// ---------------------------------------------------------------------------
-// Crossfade between the drawn scene (in the composer's buffer, still HDR) and Google's Earth
-// (rendered here). The drawn scene gets its filmic tone curve here; the photographs don't.
-// ---------------------------------------------------------------------------
-class MixPass extends Pass {
-  constructor(samples) {
-    super();
-    this.rt = new WebGLRenderTarget(1, 1, { type: HalfFloatType, samples });
-    this.mix = 0;
-    this.scene = null; this.camera = null;
-    this.quad = new FullScreenQuad(new ShaderMaterial({
-      uniforms: { tWorld: { value: null }, tEarth: { value: null }, uMix: { value: 0 }, uExposure: { value: 1.05 } },
-      vertexShader: 'varying vec2 vUv; void main(){ vUv = uv; gl_Position = vec4(position.xy, 0.0, 1.0); }',
-      fragmentShader: `
-        uniform sampler2D tWorld; uniform sampler2D tEarth; uniform float uMix; uniform float uExposure; varying vec2 vUv;
-        vec3 RRTAndODTFit(vec3 v) { vec3 a = v * (v + 0.0245786) - 0.000090537; vec3 b = v * (0.983729 * v + 0.4329510) + 0.238081; return a / b; }
-        vec3 aces(vec3 c) {
-          const mat3 I = mat3(vec3(0.59719, 0.07600, 0.02840), vec3(0.35458, 0.90834, 0.13383), vec3(0.04823, 0.01566, 0.83777));
-          const mat3 O = mat3(vec3(1.60475, -0.10208, -0.00327), vec3(-0.53108, 1.10813, -0.07276), vec3(-0.07367, -0.00605, 1.07602));
-          c *= uExposure / 0.6; c = I * c; c = RRTAndODTFit(c); c = O * c; return clamp(c, 0.0, 1.0);
-        }
-        void main() {
-          vec3 w = uMix < 0.999 ? aces(texture2D(tWorld, vUv).rgb) : vec3(0.0);
-          vec3 e = uMix > 0.001 ? texture2D(tEarth, vUv).rgb : vec3(0.0);
-          gl_FragColor = vec4(mix(w, e, uMix), 1.0);
-        }`,
-      depthTest: false, depthWrite: false,
-    }));
-  }
-  setSize(w, h) { this.rt.setSize(w, h); }
-  render(renderer, writeBuffer, readBuffer) {
-    const u = this.quad.material.uniforms;
-    if (this.mix > 0.001) {
-      renderer.setRenderTarget(this.rt);
-      renderer.clear();
-      renderer.render(this.scene, this.camera);
-    }
-    u.tWorld.value = readBuffer.texture;
-    u.tEarth.value = this.rt.texture;
-    u.uMix.value = this.mix;
-    renderer.setRenderTarget(this.renderToScreen ? null : writeBuffer);
-    if (this.clear) renderer.clear();
-    this.quad.render(renderer);
-  }
 }
 
 // ---------------------------------------------------------------------------
@@ -165,9 +117,6 @@ async function boot() {
   composer.addPass(new ShaderPass(sanitizePass));
   const bloom = new UnrealBloomPass(new Vector2(window.innerWidth, window.innerHeight), 0.42, 0.35, 1.05);
   composer.addPass(bloom);
-  const mixPass = new MixPass(quality.low ? 0 : 4);
-  mixPass.enabled = false;
-  composer.addPass(mixPass);
   let bloomAllowed = true;
   composer.addPass(new OutputPass());
   const final = new ShaderPass(finalPass);
@@ -222,18 +171,6 @@ async function boot() {
     world.waterMeshes.forEach((w, i) => { w.visible = was[i]; });
   }
 
-  // ---- Photographed Earth (when a Google Maps key is configured) ------------------
-  // Only Google's 3D tiles and the sky; the drawn cities are the fallback if Google fails.
-  const gkey = (document.querySelector('meta[name="gmaps-key"]')?.content || '').trim();
-  let earth = null;
-  if (gkey && !params.has('generated') && !quality.night && !quality.maps) {
-    try { earth = createEarth({ key: gkey, renderer }); } catch (e) { console.warn('3D tiles unavailable', e); }
-  }
-  // ?gcam=lat,lon,altM,lookLat,lookLon,lookAltM places the camera anywhere on the globe (tuning)
-  const gcam = params.has('gcam') ? params.get('gcam').split(',').map(Number) : null;
-  const gframe = { pos: [0, 0, 0], look: [0, 0, 0], ox: 0, oy: 0, fov: 40, pull: 1, flight: 0 };
-  const ePos = new Vector3(), eLook = new Vector3();
-  let earthMode = null;   // switches the page between Google's Earth and the drawn cities
 
   // ---- Network maps (chapters 02-08; the 01 opening stays the 3D night map) -----------------
   let netmap = null, netHost = null, netMix = -1;
@@ -320,7 +257,6 @@ async function boot() {
     composer.setSize(w, h);
     world.uPixelRatio.value = dpr;
     sizeReflection();
-    if (earth) earth.resize();
     if (netmap) netmap.resize();
     computeAnchors();
   }
@@ -435,62 +371,11 @@ async function boot() {
       }
     }
 
-    // ---- Our drawn opening (01) crossfades into Google's Earth on the way down ----
-    const useEarth = !!earth && !earth.failed;
-    // Google's Earth near the cities; our drawn night map for the opening and high up on the
-    // flight between them (Google's globe is coarse and blurry from that height)
-    let mix = useEarth ? (gcam ? 1 : smooth(0.12, 0.62, pSmooth)) : 0;   // 0 drawn, 1 Google
-    if (useEarth && !gcam) { sampleJourneyGeo(pSmooth, aspect, gframe); mix *= 1 - smooth(40000, 180000, gframe.pos[2]); }
-    const drawWorld = mix < 0.999, drawEarth = mix > 0.001;
-    if (useEarth !== earthMode) {
-      earthMode = useEarth;
-      // with Google in use the crossfade pass applies the filmic curve to the drawn scene only
-      renderer.toneMapping = useEarth ? NoToneMapping : ACESFilmicToneMapping;
-      mixPass.enabled = useEarth;
-      if (useEarth) { mixPass.scene = earth.scene; mixPass.camera = earth.camera; }
-    }
-    const photo = mix > 0.5;
-    if (photo !== document.body.classList.contains('real-cities')) {
-      document.body.classList.toggle('real-cities', photo);
-      worldHit = null;
-      if (finePointer) cursor.classList.remove('is-world');
-    }
-    final.uniforms.uGrain.value = 0.028 + (0.01 - 0.028) * mix;
-    final.uniforms.uAberration.value = 0.0006 * (1 - mix);
-    final.uniforms.uVignette.value = 0.9 + (0.35 - 0.9) * mix;
-    mixPass.mix = mix;
-    renderPass.enabled = drawWorld;
-    bloom.enabled = bloomAllowed && drawWorld;
-
-    let altM = 0;
-    if (useEarth) {
-      // Google's camera always runs (so the globe is already loaded when the opening dissolves)
-      const ec = earth.camera;
-      sampleJourneyGeo(pSmooth, aspect, gframe);
-      if (gcam) { gframe.pos = gcam.slice(0, 3); gframe.look = gcam.slice(3, 6); gframe.ox = 0; gframe.oy = 0; }
-      if (intro < 1) gframe.pos[2] *= 1 + (1 - intro) * 0.35;
-      earth.toFrame(gframe, ePos, eLook);
-      ec.up.set(0, 1, 0);
-      ec.position.copy(ePos);
-      ec.lookAt(eLook);
-      const d = ePos.distanceTo(eLook);
-      tmp.set(1, 0, 0).applyQuaternion(ec.quaternion).multiplyScalar(parallax.x * d * 0.02);
-      tmp2.set(0, 1, 0).applyQuaternion(ec.quaternion).multiplyScalar(parallax.y * d * 0.012);
-      ec.position.add(tmp).add(tmp2);
-      ec.lookAt(eLook);
-      altM = Math.max(2, gframe.pos[2]);
-      ec.fov = gframe.fov;
-      // depth range: a few metres up close, out past the horizon from orbit
-      ec.near = Math.max(1, altM * 0.04);
-      ec.far = Math.max(60000, 2.2 * Math.sqrt(2 * 6371000 * altM + altM * altM));
-      ec.setViewOffset(W(), H(), -gframe.ox * W(), gframe.oy * H(), W(), H());
-      ec.updateProjectionMatrix();
-      ec.updateMatrixWorld();
-      earth.update(altM, time);
-    }
+    // ---- Our drawn scene: the 01 opening (and, with ?drawn, every chapter) ----
+    bloom.enabled = bloomAllowed;
 
     let alt = 0;
-    if (drawWorld) {
+    {
     // camera
     sampleJourney(pSmooth, aspect, frame);
     if (debugCam) { frame.pos.copy(debugCam[0]); frame.look.copy(debugCam[1]); frame.ox = 0; frame.oy = 0; }
@@ -521,6 +406,9 @@ async function boot() {
     world.fog.detail.value = 1 - smooth(140, 700, alt);
     world.clouds.uniforms.uOpacity.value = 0.42 * smooth(110, 600, alt) * (1 - smooth(25000, 40000, alt)) + 0.5 * frame.flight * smooth(60, 200, alt);
     world.map.uniforms.uLights.value = 0.6 + 0.6 * smooth(50, 3000, alt);
+    // major cities switch on in a wave once the page has loaded; only from high up
+    if (started) world.metros.ignite.value = Math.min(1, world.metros.ignite.value + dt / (reducedMotion.matches ? 0.01 : 3.2));
+    world.metros.on.value = smooth(1500, 6000, alt);
 
     // offices: beams and rings that stay readable from street level to orbit
     world.offices.forEach((o) => {
@@ -528,8 +416,7 @@ async function boot() {
       o.beam.scale.set(Math.max(0.12, d * 0.0035), Math.max(8, d * 0.45), Math.max(0.12, d * 0.0035));
       o.ring.scale.setScalar(Math.max(0.8, d * 0.06));
       const on = Math.max(weight(0), weight(7) * (o.id === 'orlando' ? 1 : 0), weight(2) * (o.id === 'new-york' ? 1 : 0), weight(3) * (o.id === 'orlando' ? 1 : 0), 0.12);
-      // over the photographed cities the light columns only show from the air (the map), never at street level
-      const air = world.realCities ? smooth(150, 1500, alt) : 1;
+      const air = 1;
       o.beamMat.uniforms.uIntensity.value = 1.2 * on * air * (0.35 + 0.65 * smooth(4, 60, d)) * (hotOffice === o.id ? 1.8 : 1);
       o.ringMat.uniforms.uOn.value = on * air;
     });
@@ -549,7 +436,7 @@ async function boot() {
     typeLabels.forEach((t, i) => {
       t.el.classList.toggle('is-hot', hotType === i);
       tmp2.copy(t.t.local).add(world.nyc.center);
-      placeLabel(t.el, tmp2.clone(), wC > 0.55 && aspect > 0.9 && !world.realCities);
+      placeLabel(t.el, tmp2.clone(), wC > 0.55 && aspect > 0.9);
     });
 
     // advisory tower floors
@@ -561,7 +448,7 @@ async function boot() {
     floorLabels.forEach((fl) => {
       fl.el.classList.toggle('is-hot', hotNode === fl.i);
       tmp2.copy(tw.floorLocal(fl.i)).add(world.orl.center);
-      const show = !world.realCities && wA > 0.55 && (aspect > 0.9 || hotNode === fl.i) && tw.uniforms.uDraw.value > fl.i / 15 + 0.05;
+      const show = wA > 0.55 && (aspect > 0.9 || hotNode === fl.i) && tw.uniforms.uDraw.value > fl.i / 15 + 0.05;
       placeLabel(fl.el, tmp2.clone(), show, 26, 0);
     });
 
@@ -608,22 +495,18 @@ async function boot() {
     const reflOn = refl.on && alt < 60 && world.fog.detail.value > 0.05;
     world.reflect.uReflectOn.value = reflOn ? 1 : 0;
     if (reflOn) renderReflection(-frame.ox * W(), frame.oy * H());
-    }   // drawWorld
+    }
 
     composer.render(dt);
 
     if (time - lastUI > 0.1) {
       lastUI = time;
-      if (photo) {
-        bus.setProgress(p, Math.round(p), `${fmtLat(gframe.pos[0])} · ${fmtLon(gframe.pos[1])} · ALT ${fmtAlt(altM)}`);
-      } else {
-        const ll = unproject(camera.position.x, camera.position.z);
-        bus.setProgress(p, Math.round(p), `${fmtLat(ll.lat)} · ${fmtLon(ll.lon)} · ALT ${fmtAlt(altitudeM(alt, ll.lat))}`);
-      }
+      const ll = unproject(camera.position.x, camera.position.z);
+      bus.setProgress(p, Math.round(p), `${fmtLat(ll.lat)} · ${fmtLon(ll.lon)} · ALT ${fmtAlt(altitudeM(alt, ll.lat))}`);
     }
 
-    // frame-time check (not while Google's tiles are streaming in: parsing them is a one-off cost)
-    if (started && perf.checked < 4 && !(photo && earth.busy)) {
+    // frame-time check
+    if (started && perf.checked < 4) {
       perf.frames++; perf.acc += dt;
       if (perf.frames >= 90) {
         const avg = perf.acc / perf.frames;
