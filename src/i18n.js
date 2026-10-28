@@ -30,6 +30,8 @@ const ES = {
   // places
   'Financial District': 'Distrito Financiero',
   'East Orlando · UCF': 'Este de Orlando · UCF',
+  'Downtown Orlando': 'Centro de Orlando',
+  'International Drive': 'International Drive',
   // page
   'Previous chapter': 'Capítulo anterior',
   'Next chapter': 'Capítulo siguiente',
