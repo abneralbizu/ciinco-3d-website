@@ -74,7 +74,7 @@ ciinco-3d-website/
 │       ├── js/cosmos.js          The built 3D engine + page behaviour (generated, don't edit)
 │       ├── textures/             East Coast night map (generated, see below)
 │       ├── data/                 New York shorelines, map bounds (generated)
-│       ├── images/               Favicon, social-share image, portrait, Equal Housing logo
+│       ├── images/               Logo (ciinco-logo*.svg, from the original vector file), favicon, portraits, Equal Housing logo
 │       ├── fonts/                Archivo, Instrument Serif, JetBrains Mono (SIL OFL, licences included)
 │       └── docs/                 Signed SOP PDFs
 ├── src/                          Source for assets/js/cosmos.js
