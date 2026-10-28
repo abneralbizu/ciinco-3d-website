@@ -597,3 +597,20 @@ body.netmap-on #labels, body.netmap-on #map-credit { display: none; }
 @media (max-width: 359px) {
   .lang-switch a[aria-current="true"] { display: none; }   /* very small phones: just the other language */
 }
+
+/* ---- Bio page sections (Rafael: real estate / healthcare / due diligence) ---------- */
+.bio-nav { display: flex; flex-wrap: wrap; gap: 8px; margin: 30px 0 8px; }
+.bio-nav a { text-decoration: none; color: var(--ink); font-size: 0.86rem; padding: 9px 16px; border: 1px solid var(--line-2); border-radius: 999px; transition: background-color 0.3s, color 0.3s, border-color 0.3s; }
+.bio-nav a:hover { background: var(--ink); color: var(--bg); border-color: var(--ink); }
+.bio-section { margin-top: 44px; padding-top: 28px; border-top: 1px solid var(--line); scroll-margin-top: 100px; }
+.doc .bio-section h2 { border-top: 0; padding-top: 0; margin-top: 0; font-weight: 400; font-stretch: 106%; font-size: clamp(1.3rem, 2.2vw, 1.65rem); line-height: 1.2; letter-spacing: -0.01em; margin: 0 0 16px; color: var(--ink); display: flex; gap: 14px; align-items: baseline; }
+.bio-num { font-size: 0.66rem; letter-spacing: 0.14em; color: var(--accent); }
+.doc .bio-list { list-style: none; padding: 0; margin: 4px 0 18px; display: grid; gap: 10px; }
+.doc .bio-list li { position: relative; padding-left: 22px; margin: 0; line-height: 1.55; }
+.doc .bio-list li::before { content: ""; position: absolute; left: 2px; top: 0.62em; width: 7px; height: 7px; border-radius: 50%; border: 1px solid var(--accent); }
+.bio-list strong { color: var(--ink); font-weight: 500; }
+.doc .bio-creds h2 { font-size: 1.05rem; }
+.doc-bio .bio-photo img[width="480"] { max-width: 440px; }
+.svc-link { display: inline-block; margin-top: 6px; color: var(--accent); text-decoration: none; border-bottom: 1px solid rgba(143, 182, 255, 0.35); font-size: 0.92em; }
+.svc-link:hover { color: var(--ink); border-bottom-color: var(--ink); }
+.panel-wide .agent-mini { margin-top: 22px; }

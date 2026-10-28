@@ -64,7 +64,8 @@ ciinco-3d-website/
 │   ├── standardized-operating-procedures*.html   SOP chooser + Florida + New York
 │   ├── thanks.html               Shown after the contact form is sent
 │   ├── liza-figueroa.html        Liza Figueroa's bio
-│   ├── es/                       Spanish versions: index.html, liza-figueroa.html, gracias.html
+│   ├── rafael-gonzalez.html      Rafael A. Gonzalez's bio (real estate, healthcare, due diligence)
+│   ├── es/                       Spanish versions: index.html, liza-figueroa.html, rafael-gonzalez.html, gracias.html
 │   ├── 404.html                  "Page not found"
 │   ├── _headers                  Security + caching headers (Netlify / Cloudflare Pages)
 │   ├── _redirects                /sop short link
