@@ -539,3 +539,31 @@ body.real-cities #labels { display: none; }
 body.netmap-on #labels, body.netmap-on #map-credit { display: none; }
 .nm-label.is-left span { transform: translate(calc(-100% - 12px), -50%); }
 .nm-label.nm-hub.is-left span { transform: translate(calc(-100% - 16px), -50%); }
+
+/* ---- Agents ----------------------------------------------------------------------- */
+.agents { margin-top: 36px; display: grid; gap: 20px; }
+.agents .agent { margin-top: 0; }
+.agent-mini { margin-top: 28px; display: inline-flex; gap: 16px; align-items: center; padding: 12px 22px 12px 12px; border: 1px solid var(--line); border-radius: 999px; background: var(--glass); color: inherit; text-decoration: none; transition: border-color 0.3s, background 0.3s; }
+.agent-mini:hover { border-color: var(--line-2); background: rgba(14, 18, 36, 0.7); }
+.agent-mini img { width: 58px; height: 58px; }
+.agent-kicker { margin: 0 0 2px; font-size: 0.56rem; letter-spacing: 0.14em; text-transform: uppercase; color: var(--ink-3); }
+.agent-mini .agent-title { margin-bottom: 0; }
+.agent-more { margin-left: 6px; color: var(--accent); font-size: 0.88rem; white-space: nowrap; }
+
+/* ---- Agent bio page --------------------------------------------------------------- */
+.doc-bio .doc-inner { max-width: 1120px; }
+.bio-grid { display: grid; grid-template-columns: minmax(0, 5fr) minmax(0, 6fr); gap: clamp(28px, 5vw, 72px); align-items: start; }
+.bio-photo { margin: 0; position: sticky; top: 110px; }
+.bio-photo img { display: block; width: 100%; height: auto; border-radius: 18px; box-shadow: 0 0 0 1px var(--line), 0 30px 80px -30px rgba(0, 0, 0, 0.8); }
+.bio-tagline { font-family: var(--f-serif); font-style: italic; font-size: clamp(1.3rem, 2.2vw, 1.6rem); color: var(--gold) !important; margin: 0 0 22px !important; }
+.bio-facts { list-style: none; padding: 0; margin: 0 0 28px; display: flex; flex-wrap: wrap; gap: 8px; }
+.bio-facts li { border: 1px solid var(--line-2); border-radius: 999px; padding: 6px 12px; font-size: 0.6rem; letter-spacing: 0.12em; text-transform: uppercase; color: var(--ink); }
+.bio-actions { display: flex; flex-wrap: wrap; gap: 12px; margin-top: 30px !important; }
+.bio-brokerage { margin-top: 28px !important; font-size: 0.8rem; color: var(--ink-3) !important; }
+.nowrap { white-space: nowrap; }
+@media (max-width: 860px) {
+  .bio-grid { grid-template-columns: 1fr; }
+  .bio-photo { position: static; max-width: 440px; }
+}
+.agent-mini > span:not(.agent-more) > span { display: block; }
+.doc .bio-facts { padding: 0; margin-left: 0; } .doc .bio-facts li { margin: 0; list-style: none; }
