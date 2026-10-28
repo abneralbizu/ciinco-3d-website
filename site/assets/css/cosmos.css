@@ -161,8 +161,9 @@ body:not(.is-loading) .loader { opacity: 0; visibility: hidden; }
 .system-map { position: fixed; right: clamp(16px, 2.4vw, 36px); top: 50%; transform: translateY(-50%); z-index: 50; display: flex; gap: 14px; }
 .system-map ol { list-style: none; margin: 0; padding: 0; display: grid; gap: 4px; }
 .system-map a { display: flex; align-items: center; justify-content: flex-end; gap: 12px; padding: 5px 0; text-decoration: none; color: var(--ink-3); }
-.sm-num { font-size: 0.64rem; transition: color 0.3s; }
-.sm-name { font-size: 0.74rem; letter-spacing: 0.04em; opacity: 0; transform: translateX(8px); transition: opacity 0.4s var(--ease), transform 0.4s var(--ease); white-space: nowrap; }
+.sm-num { font-size: 0.64rem; min-width: 2.4ch; text-align: right; transition: color 0.3s; }
+/* names sit left of the numbers, so the numbers line up in one straight column */
+.sm-name { order: -1; font-size: 0.74rem; letter-spacing: 0.04em; opacity: 0; transform: translateX(8px); transition: opacity 0.4s var(--ease), transform 0.4s var(--ease); white-space: nowrap; }
 .system-map:hover .sm-name, .system-map a:focus-visible .sm-name, .system-map a.is-active .sm-name { opacity: 1; transform: none; }
 .system-map:not(:hover) a:not(.is-active) .sm-name { opacity: 0; }
 .system-map a.is-active { color: var(--ink); }
