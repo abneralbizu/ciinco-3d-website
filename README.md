@@ -69,7 +69,8 @@ ciinco-3d-website/
 │   ├── thanks.html               Shown after the contact form is sent
 │   ├── liza-figueroa.html        Liza Figueroa's bio
 │   ├── rafael-gonzalez.html      Rafael A. Gonzalez's bio (real estate, healthcare, due diligence)
-│   ├── es/                       Spanish versions: index.html, liza-figueroa.html, rafael-gonzalez.html, gracias.html
+│   ├── advisory.html             The 15 advisory services, each explained (the homepage list links here)
+│   ├── es/                       Spanish versions: index.html, liza-figueroa.html, rafael-gonzalez.html, advisory.html, gracias.html
 │   ├── 404.html                  "Page not found"
 │   ├── _headers                  Security + caching headers (Netlify / Cloudflare Pages)
 │   ├── _redirects                /sop short link
