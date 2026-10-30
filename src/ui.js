@@ -135,7 +135,9 @@ export function initUI(bus) {
       document.body.dataset.side = SIDES[active] || 'left';
       mapLinks.forEach((a, i) => a.classList.toggle('is-active', i === active));
       const id = chapters[active] && chapters[active].id;
-      navLinks.forEach((a) => a.setAttribute('aria-current', String(a.getAttribute('href') === `#${id}`)));
+      // the menu item for this chapter stays underlined (New York and Florida are both Commercial)
+      const navFor = { launch: 'launch', commercial: 'launch' }[id] || id;
+      navLinks.forEach((a) => a.setAttribute('aria-current', String(a.getAttribute('href') === `#${navFor}`)));
       if (sector) {
         const name = mapLinks[active] ? mapLinks[active].querySelector('.sm-name').textContent : '';
         sector.textContent = `${String(active + 1).padStart(2, '0')} · ${name}`;
@@ -145,16 +147,12 @@ export function initUI(bus) {
   };
 
   // Header: tinted once scrolled, hidden while scrolling down, back on scroll up.
+  // The header (name, menu, EN/ES) stays on screen in every chapter, so visitors can jump
+  // anywhere without scrolling back up; it gains a dark backing once the page has scrolled.
   const header = $('.site-header');
-  let lastY = window.scrollY;
-  window.addEventListener('scroll', () => {
-    const yy = window.scrollY;
-    header.classList.toggle('is-scrolled', yy > 40);
-    const navOpen = list.classList.contains('is-open');
-    if (!navOpen && Math.abs(yy - lastY) > 6) header.classList.toggle('is-hidden', yy > lastY && yy > 400);
-    lastY = yy;
-  }, { passive: true });
-  header.addEventListener('focusin', () => header.classList.remove('is-hidden'));
+  const onScroll = () => header.classList.toggle('is-scrolled', window.scrollY > 40);
+  window.addEventListener('scroll', onScroll, { passive: true });
+  onScroll();
 
   // Footer in view: tuck the chapter chrome away.
   const footer = $('.site-footer');
