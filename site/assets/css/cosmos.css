@@ -330,7 +330,8 @@ main { position: relative; z-index: 2; overflow-x: clip; }
 .stat dt { font-family: var(--f-mono); font-size: 0.62rem; letter-spacing: 0.14em; text-transform: uppercase; color: var(--ink-3); }
 .stat dd { margin: 0; display: flex; align-items: baseline; justify-content: center; flex-wrap: wrap; gap: 2px; }
 .stat-num { font-weight: 200; font-stretch: 118%; font-size: clamp(2.6rem, 5.2vw, 4.8rem); line-height: 1; letter-spacing: -0.04em; font-variant-numeric: tabular-nums; }
-.stat-pre { font-weight: 200; font-size: clamp(1.4rem, 2.4vw, 2.2rem); color: var(--ink-2); align-self: flex-start; margin-top: 0.3em; }
+/* the $ sits on the number's baseline, in the gold serif used for 'years' and 'offices' */
+.stat-pre { font-family: var(--f-serif); font-style: italic; font-weight: 400; font-size: clamp(1.7rem, 2.35vw, 2.5rem); line-height: 1; color: var(--gold); align-self: baseline; margin: 0 3px 0 0; }
 /* full dollar figures ($197,000,000) are long: smaller and narrower so they fit their column */
 .stat-num.stat-long { font-size: clamp(1.7rem, 2.35vw, 2.5rem); font-stretch: 100%; letter-spacing: -0.02em; }
 .stat-unit { font-family: var(--f-serif); font-style: italic; font-size: clamp(1.1rem, 1.6vw, 1.5rem); color: var(--gold); margin-left: 6px; }
@@ -625,5 +626,5 @@ body.netmap-on #labels, body.netmap-on #map-credit { display: none; }
 .stat dd:has(.stat-long) { flex-wrap: nowrap; }
 @media (max-width: 520px) {
   .stat-num.stat-long { font-size: 1.32rem; letter-spacing: -0.01em; }
-  .stat dd:has(.stat-long) .stat-pre { font-size: 1rem; margin-top: 0.15em; }
+  .stat dd:has(.stat-long) .stat-pre { font-size: 1.32rem; margin: 0 2px 0 0; }
 }
