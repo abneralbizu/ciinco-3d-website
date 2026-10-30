@@ -74,15 +74,16 @@ export function initUI(bus) {
   // ---- Counters -------------------------------------------------------------
   function runCounters(root) {
     $$('[data-count]', root).forEach((el) => {
-      const end = parseInt(el.textContent, 10);
+      const end = parseInt(el.dataset.count || el.textContent.replace(/,/g, ''), 10);
       if (!Number.isFinite(end) || reducedMotion.matches) return;
+      const fmt = (n) => (end >= 1000 ? n.toLocaleString('en-US') : String(n));   // 197,000,000
       const t0 = performance.now() + 450;
       const dur = 1800;
       el.textContent = '0';
       const step = (now) => {
         const t = Math.min(1, Math.max(0, (now - t0) / dur));
         const e = t === 1 ? 1 : 1 - Math.pow(2, -10 * t);
-        el.textContent = String(Math.round(end * e));
+        el.textContent = fmt(Math.round(end * e));
         if (t < 1) requestAnimationFrame(step);
       };
       requestAnimationFrame(step);
