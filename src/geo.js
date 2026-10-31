@@ -53,7 +53,7 @@ export function grid(a, s) {
 // ---------------------------------------------------------------------------
 export const PLACES = {
   nyc: { lat: 40.735, lon: -73.99 },
-  nyOffice: { lat: 40.7459, lon: -73.9867, name: 'New York', sub: 'Commercial · 276 Fifth Ave.' }, // 5th Ave & 30th St
+  nyOffice: { lat: 40.7459, lon: -73.9867, name: 'New York', sub: 'Commercial · Residential · 276 Fifth Ave.' }, // 5th Ave & 30th St
   orlando: { lat: 28.5434, lon: -81.3765 },
   lakeEola: { lat: 28.5434, lon: -81.3725 },
   orlandoOffice: { lat: 28.6555, lon: -81.2605, name: 'Florida', sub: 'Commercial · Residential · Winter Springs' }, // Willa Springs, Red Bug Lake Rd & Tuskawilla Rd

@@ -26,7 +26,7 @@
   <meta name="twitter:image" content="https://abneralbizu.github.io/ciinco-3d-website/assets/images/share-es.jpg">
   <link rel="preload" href="../assets/fonts/archivo-variable.woff2" as="font" type="font/woff2" crossorigin>
   <link rel="preload" href="../assets/fonts/instrument-serif-italic.woff2" as="font" type="font/woff2" crossorigin>
-  <link rel="stylesheet" href="../assets/css/cosmos.css?v=hdr4">
+  <link rel="stylesheet" href="../assets/css/cosmos.css?v=nyres1">
   <link rel="stylesheet" href="../assets/css/maplibre-gl.css">
   <script type="application/ld+json">
   {
@@ -96,13 +96,14 @@
   <nav class="system-map" aria-label="Capítulos">
     <ol>
       <li><a href="#main" data-chapter="0"><span class="sm-num mono">01</span><span class="sm-name">Nuestras ciudades</span></a></li>
-      <li><a href="#launch" data-chapter="1"><span class="sm-num mono">02</span><span class="sm-name">Nueva York</span></a></li>
-      <li><a href="#commercial" data-chapter="2"><span class="sm-num mono">03</span><span class="sm-name">Florida</span></a></li>
-      <li><a href="#residential" data-chapter="3"><span class="sm-num mono">04</span><span class="sm-name">Residencial</span></a></li>
-      <li><a href="#advisory" data-chapter="4"><span class="sm-num mono">05</span><span class="sm-name">Asesoría</span></a></li>
-      <li><a href="#record" data-chapter="5"><span class="sm-num mono">06</span><span class="sm-name">Trayectoria</span></a></li>
-      <li><a href="#listings" data-chapter="6"><span class="sm-num mono">07</span><span class="sm-name">Propiedades</span></a></li>
-      <li><a href="#contact" data-chapter="7"><span class="sm-num mono">08</span><span class="sm-name">Contacto</span></a></li>
+      <li><a href="#launch" data-chapter="1"><span class="sm-num mono">02</span><span class="sm-name">Comercial · NY</span></a></li>
+      <li><a href="#commercial" data-chapter="2"><span class="sm-num mono">03</span><span class="sm-name">Comercial · FL</span></a></li>
+      <li><a href="#residential" data-chapter="3"><span class="sm-num mono">04</span><span class="sm-name">Residencial · FL</span></a></li>
+      <li><a href="#residential-ny" data-chapter="4"><span class="sm-num mono">05</span><span class="sm-name">Residencial · NY</span></a></li>
+      <li><a href="#advisory" data-chapter="5"><span class="sm-num mono">06</span><span class="sm-name">Asesoría</span></a></li>
+      <li><a href="#record" data-chapter="6"><span class="sm-num mono">07</span><span class="sm-name">Trayectoria</span></a></li>
+      <li><a href="#listings" data-chapter="7"><span class="sm-num mono">08</span><span class="sm-name">Propiedades</span></a></li>
+      <li><a href="#contact" data-chapter="8"><span class="sm-num mono">09</span><span class="sm-name">Contacto</span></a></li>
     </ol>
     <span class="sm-track" aria-hidden="true"><span class="sm-fill" id="sm-fill"></span></span>
   </nav>
@@ -110,7 +111,7 @@
   <!-- Previous / next chapter, for visitors who would rather click than scroll -->
   <nav class="stepper" aria-label="Moverse entre capítulos">
     <button type="button" class="step-btn" id="step-prev" aria-label="Capítulo anterior"><span aria-hidden="true">↑</span></button>
-    <button type="button" class="step-btn step-next" id="step-next" aria-label="Capítulo siguiente: Nueva York"><span class="step-name mono" id="step-name">Nueva York</span><span aria-hidden="true">↓</span></button>
+    <button type="button" class="step-btn step-next" id="step-next" aria-label="Capítulo siguiente: Comercial · NY"><span class="step-name mono" id="step-name">Comercial · NY</span><span aria-hidden="true">↓</span></button>
   </nav>
 
   <div class="telemetry mono" aria-hidden="true">
@@ -140,7 +141,7 @@
             <li class="office" data-office="new-york">
               <p class="office-coords mono">40.75° N · 73.99° W</p>
               <h3>Nueva York</h3>
-              <p class="office-tag">Comercial</p>
+              <p class="office-tag">Comercial y residencial</p>
               <address>276 Fifth Ave., Suite 704-265<br>New York, NY 10001</address>
               <a class="office-phone" href="tel:+13472486258">347-248-6258</a>
             </li>
@@ -232,17 +233,48 @@
             </span>
             <span class="agent-more" aria-hidden="true">Conozca a Liza →</span>
           </a>
-          <p class="note reveal">¿Va a comprar o alquilar con nosotros? Lea primero nuestros <a href="../standardized-operating-procedures.html" hreflang="en">Procedimientos Operativos Estandarizados</a> (en inglés). Explican lo que pedimos a cada comprador e inquilino antes de comenzar.</p>
-          <p class="next-row reveal"><a class="btn btn-ghost btn-sm next-link" href="#advisory"><span class="next-label mono">Siguiente · 05</span> Asesoría <span class="btn-arrow" aria-hidden="true">→</span></a></p>
+          <p class="note reveal">¿Va a comprar o alquilar en Florida? Lea primero nuestros <a href="../standardized-operating-procedures-florida.html" hreflang="en">Procedimientos Operativos Estandarizados de Florida</a> (en inglés). Explican lo que pedimos a cada comprador e inquilino antes de comenzar.</p>
+          <p class="next-row reveal"><a class="btn btn-ghost btn-sm next-link" href="#residential-ny"><span class="next-label mono">Siguiente · 05</span> Nueva York <span class="btn-arrow" aria-hidden="true">→</span></a></p>
+        </div>
+      </div>
+    </section>
+
+    <!-- ===== 05 RESIDENTIAL · NEW YORK ===== -->
+    <section class="chapter chapter-left" id="residential-ny" data-chapter="4" aria-labelledby="residential-ny-title">
+      <div class="wrap">
+        <div class="panel">
+          <p class="kicker mono reveal"><span class="kicker-num">05</span> Residencial · Nueva York</p>
+          <h2 id="residential-ny-title" class="display-2 reveal-lines"><span class="line"><span>Su próxima dirección</span></span><span class="line"><span><em>en Nueva York.</em></span></span></h2>
+          <p class="body reveal">Desde apartamentos en Manhattan hasta viviendas en todos los distritos, ayudamos a nuestros clientes a comprar, vender y alquilar propiedades residenciales en Nueva York, con el mismo cuidado que dedicamos a cada operación comercial.</p>
+          <ol class="services reveal-stagger">
+            <li><span class="svc-num mono">A</span><div><h3>Comprar una vivienda</h3><p>Condominios, cooperativas y casas: encuentre una vivienda que se ajuste a sus necesidades y a su presupuesto, con orientación desde la primera visita hasta el cierre.</p></div></li>
+            <li><span class="svc-num mono">B</span><div><h3>Vender una vivienda</h3><p>Presente su vivienda a compradores calificados y avance del listado al cierre con un plan claro.</p></div></li>
+            <li><span class="svc-num mono">C</span><div><h3>Alquilar</h3><p>Encuentre un apartamento para alquilar, o los inquilinos adecuados para su propiedad.</p></div></li>
+            <li><span class="svc-num mono">D</span><div><h3>Debida diligencia</h3><p>Revise la propiedad, los documentos y las cifras antes de comprometerse, para tener menos sorpresas al cierre. <a class="svc-link" href="rafael-gonzalez.html#due-diligence">Cómo Rafael dirige la debida diligencia →</a></p></div></li>
+          </ol>
+          <a class="agent agent-mini reveal" href="rafael-gonzalez.html">
+            <picture>
+              <source srcset="../assets/images/rafael-gonzalez-480.webp" type="image/webp">
+              <img src="../assets/images/rafael-gonzalez-480.jpg" alt="" width="58" height="58" loading="lazy" decoding="async">
+            </picture>
+            <span>
+              <span class="agent-kicker mono">Su corredor en Nueva York</span>
+              <span class="agent-name">Rafael A. Gonzalez</span>
+              <span class="agent-title mono">Corredor y CEO · Licencia en Nueva York</span>
+            </span>
+            <span class="agent-more" aria-hidden="true">Conozca a Rafael →</span>
+          </a>
+          <p class="note reveal">¿Va a comprar o alquilar en Nueva York? Lea primero nuestros <a href="../standardized-operating-procedures-new-york.html" hreflang="en">Procedimientos Operativos Estandarizados de Nueva York</a> (en inglés). Explican lo que pedimos a cada comprador e inquilino antes de comenzar.</p>
+          <p class="next-row reveal"><a class="btn btn-ghost btn-sm next-link" href="#advisory"><span class="next-label mono">Siguiente · 06</span> Asesoría <span class="btn-arrow" aria-hidden="true">→</span></a></p>
         </div>
       </div>
     </section>
 
     <!-- ===== 04 ADVISORY ===== -->
-    <section class="chapter chapter-left" id="advisory" data-chapter="4" aria-labelledby="advisory-title">
+    <section class="chapter chapter-left" id="advisory" data-chapter="5" aria-labelledby="advisory-title">
       <div class="wrap">
         <div class="panel panel-wide">
-          <p class="kicker mono reveal"><span class="kicker-num">05</span> Asesoría</p>
+          <p class="kicker mono reveal"><span class="kicker-num">06</span> Asesoría</p>
           <h2 id="advisory-title" class="display-2 reveal-lines"><span class="line"><span>Asesoría en cada etapa</span></span><span class="line"><span><em>del ciclo de propiedad.</em></span></span></h2>
           <p class="body reveal">Ofrecemos un conocimiento profundo de los entornos de negocio dinámicos y la capacidad de responder a las condiciones del mercado que pueden afectar una sola propiedad o una cartera completa. Seleccione un servicio para leer en qué consiste.<span class="gen-only"> Pase el cursor sobre uno para iluminar su conexión.</span></p>
           <ol class="consulting reveal-stagger" id="consulting">
@@ -275,15 +307,15 @@
             </span>
             <span class="agent-more" aria-hidden="true">Su experiencia en salud →</span>
           </a>
-          <p class="next-row reveal"><a class="btn btn-ghost btn-sm next-link" href="#record"><span class="next-label mono">Siguiente · 06</span> Trayectoria <span class="btn-arrow" aria-hidden="true">→</span></a></p>
+          <p class="next-row reveal"><a class="btn btn-ghost btn-sm next-link" href="#record"><span class="next-label mono">Siguiente · 07</span> Trayectoria <span class="btn-arrow" aria-hidden="true">→</span></a></p>
         </div>
       </div>
     </section>
 
     <!-- ===== 05 TRACK RECORD ===== -->
-    <section class="chapter chapter-center" id="record" data-chapter="5" aria-labelledby="record-title">
+    <section class="chapter chapter-center" id="record" data-chapter="6" aria-labelledby="record-title">
       <div class="wrap">
-        <p class="kicker mono reveal"><span class="kicker-num">06</span> Trayectoria</p>
+        <p class="kicker mono reveal"><span class="kicker-num">07</span> Trayectoria</p>
         <h2 id="record-title" class="display-2 reveal-lines"><span class="line"><span><span class="js-years">36</span> años</span></span><span class="line"><span><em>construyendo relaciones.</em></span></span></h2>
         <p class="body body-center reveal">Durante los últimos <span class="js-years">36</span> años hemos construido relaciones a largo plazo con un grupo selecto de clientes que confían en nuestra asesoría a lo largo de todo el ciclo de propiedad inmobiliaria.</p>
         <dl class="stats reveal-stagger">
@@ -292,37 +324,37 @@
           <div class="stat"><dt>En desarrollo</dt><dd><span class="stat-pre">$</span><span class="stat-num stat-long" data-count="35000000">35,000,000</span></dd></div>
           <div class="stat"><dt>Oficinas · Florida y Nueva York</dt><dd><span class="stat-num" data-count>2</span><span class="stat-unit">oficinas</span></dd></div>
         </dl>
-        <p class="next-row reveal next-center"><a class="btn btn-ghost btn-sm next-link" href="#listings"><span class="next-label mono">Siguiente · 07</span> Propiedades <span class="btn-arrow" aria-hidden="true">→</span></a></p>
+        <p class="next-row reveal next-center"><a class="btn btn-ghost btn-sm next-link" href="#listings"><span class="next-label mono">Siguiente · 08</span> Propiedades <span class="btn-arrow" aria-hidden="true">→</span></a></p>
       </div>
     </section>
 
     <!-- ===== 06 LISTINGS ===== -->
-    <section class="chapter chapter-right" id="listings" data-chapter="6" aria-labelledby="listings-title">
+    <section class="chapter chapter-right" id="listings" data-chapter="7" aria-labelledby="listings-title">
       <div class="wrap">
         <div class="panel">
-          <p class="kicker mono reveal"><span class="kicker-num">07</span> Propiedades</p>
+          <p class="kicker mono reveal"><span class="kicker-num">08</span> Propiedades</p>
           <h2 id="listings-title" class="display-2 reveal-lines"><span class="line"><span>Disponibles</span></span><span class="line"><span><em>ahora mismo.</em></span></span></h2>
           <p class="body reveal">Nuestras propiedades comerciales se publican en tiempo real en Crexi. Para propiedades residenciales, díganos qué busca y le enviaremos lo que esté disponible.</p>
           <ul class="listing-links reveal-stagger">
             <li><a href="https://www.crexi.com/profile/rafael-a-gonzalez-rafaelgonz" target="_blank" rel="noopener">
               <span class="ll-kicker mono">Comercial · Florida y Nueva York · Crexi</span><span class="ll-title">Propiedades en venta y arrendamiento</span><span class="ll-sub">Nuestro perfil completo en Crexi (en inglés), con las transacciones cerradas recientemente</span><span class="ll-arrow" aria-hidden="true">↗</span><span class="visually-hidden">(se abre en una pestaña nueva)</span></a></li>
             <li><a href="#contact" data-interest="Buying">
-              <span class="ll-kicker mono">Residencial · Florida</span><span class="ll-title">Viviendas en venta o alquiler</span><span class="ll-sub">Contáctenos para conocer las viviendas disponibles</span><span class="ll-arrow" aria-hidden="true">→</span></a></li>
+              <span class="ll-kicker mono">Residencial · Florida y Nueva York</span><span class="ll-title">Viviendas en venta o alquiler</span><span class="ll-sub">Contáctenos para conocer las viviendas disponibles</span><span class="ll-arrow" aria-hidden="true">→</span></a></li>
           </ul>
           <div class="crexi reveal" id="crexi">
             <button class="btn btn-ghost btn-sm" type="button" id="crexi-load">Mostrar aquí las propiedades comerciales</button>
             <p class="crexi-note">Carga el visor de propiedades de crexi.com (en inglés). <a href="https://www.crexi.com/profile/rafael-a-gonzalez-rafaelgonz" target="_blank" rel="noopener">Abrir en Crexi<span class="visually-hidden"> (se abre en una pestaña nueva)</span></a>.</p>
           </div>
-          <p class="next-row reveal"><a class="btn btn-ghost btn-sm next-link" href="#contact"><span class="next-label mono">Siguiente · 08</span> Contacto <span class="btn-arrow" aria-hidden="true">→</span></a></p>
+          <p class="next-row reveal"><a class="btn btn-ghost btn-sm next-link" href="#contact"><span class="next-label mono">Siguiente · 09</span> Contacto <span class="btn-arrow" aria-hidden="true">→</span></a></p>
         </div>
       </div>
     </section>
 
     <!-- ===== 07 CONTACT ===== -->
-    <section class="chapter chapter-left chapter-contact" id="contact" data-chapter="7" aria-labelledby="contact-title">
+    <section class="chapter chapter-left chapter-contact" id="contact" data-chapter="8" aria-labelledby="contact-title">
       <div class="wrap contact-grid">
         <div class="contact-intro">
-          <p class="kicker mono reveal"><span class="kicker-num">08</span> Contacto</p>
+          <p class="kicker mono reveal"><span class="kicker-num">09</span> Contacto</p>
           <h2 id="contact-title" class="display-2 reveal-lines"><span class="line"><span>Hablemos de</span></span><span class="line"><span><em>su próxima propiedad.</em></span></span></h2>
           <p class="body reveal">Llámenos o escríbanos directamente, o envíenos un mensaje y cuéntenos lo que necesita. Respondemos en un día hábil.</p>
           <div class="agents reveal">
@@ -410,7 +442,7 @@
       <div class="footer-brand">
         <img class="footer-logo" src="../assets/images/ciinco-logo-on-dark.svg" alt="Continental Investments International Network Co." width="240" height="130" loading="lazy">
         <p class="footer-legal-name">Continental Investments International Network LLC</p>
-        <p>Florida: bienes raíces comerciales y residenciales · Nueva York: bienes raíces comerciales</p>
+        <p>Bienes raíces comerciales y residenciales en Florida y Nueva York</p>
         <p>Rafael A. Gonzalez, corredor de bienes raíces con licencia<br>Licencia de Florida BK3000549 · Licencia de Nueva York 10371201108 (Continental Investments International Network Co.)</p>
       </div>
       <div class="footer-eho">
@@ -433,6 +465,6 @@
     <symbol id="mark" viewBox="258 12 674 374"><path fill="#5488ce" d="M 593.89,293.3 C 688.76,293.3 780.99,304.86 869.14,326.66 L 869.14,270.96 L 816.79,270.96 L 816.79,221.79 L 767.62,221.79 L 767.62,166.27 L 708.88,166.27 L 708.88,17.15 L 620.03,17.15 L 620.03,272.56 L 570.88,272.56 L 570.88,77.43 L 475.7,77.43 L 475.7,270.96 L 443.98,270.96 L 443.98,158.32 L 413.84,118.68 L 382.12,158.32 L 382.12,274.13 L 318.65,274.13 L 318.65,326.67 C 406.81,304.88 499.0,293.3 593.89,293.3"/><path fill="url(#mark-gloss)" d="M 620.03 17.15 L 620.03 195.38 C 650.61 184.0 680.25 170.77 708.88 155.94 L 708.88 17.15 Z M 475.7 77.43 L 475.7 234.7 C 508.16 229.01 539.88 221.43 570.88 212.02 L 570.88 77.43 Z M 382.11 158.33 L 382.11 245.62 C 402.93 244.39 423.61 242.39 443.98 239.63 L 443.98 158.33 L 413.84 118.68 Z M 382.11 158.33 "/><path fill="#c9cfdb" d="M 261.25,381.61 C 312.26,356.42 367.05,338.38 423.18,327.2 C 479.32,315.71 536.67,310.89 593.88,310.7 C 651.09,310.88 708.48,315.69 764.61,327.18 C 820.74,338.31 875.53,356.37 926.53,381.61 C 818.79,344.98 706.39,329.52 593.88,329.73 C 481.39,329.45 368.94,344.91 261.25,381.61"/></symbol>
   </svg>
 
-  <script src="../assets/js/cosmos.js?v=hdr2" defer></script>
+  <script src="../assets/js/cosmos.js?v=nyres1" defer></script>
 </body>
 </html>

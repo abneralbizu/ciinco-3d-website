@@ -8,7 +8,7 @@ export const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)
 
 export const FOUNDED = 1990;
 // Which side of the screen each chapter's text sits on (drives the shading behind it).
-const SIDES = ['left', 'left', 'left', 'right', 'left', 'center', 'right', 'left'];
+const SIDES = ['left', 'left', 'left', 'right', 'left', 'left', 'center', 'right', 'left'];
 
 export function initUI(bus) {
   const chapters = $$('.chapter');
@@ -136,7 +136,7 @@ export function initUI(bus) {
       mapLinks.forEach((a, i) => a.classList.toggle('is-active', i === active));
       const id = chapters[active] && chapters[active].id;
       // the menu item for this chapter stays underlined (New York and Florida are both Commercial)
-      const navFor = { launch: 'launch', commercial: 'launch' }[id] || id;
+      const navFor = { launch: 'launch', commercial: 'launch', 'residential-ny': 'residential' }[id] || id;
       navLinks.forEach((a) => a.setAttribute('aria-current', String(a.getAttribute('href') === `#${navFor}`)));
       if (sector) {
         const name = mapLinks[active] ? mapLinks[active].querySelector('.sm-name').textContent : '';

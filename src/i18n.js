@@ -9,9 +9,9 @@ export const BASE = (root && root.dataset.base) || '';
 const ES = {
   // offices
   'New York': 'Nueva York',
-  'Commercial · 276 Fifth Ave.': 'Comercial · 276 Fifth Ave.',
+  'Commercial · Residential · 276 Fifth Ave.': 'Comercial · Residencial · 276 Fifth Ave.',
   'Commercial · Residential · Winter Springs': 'Comercial · Residencial · Winter Springs',
-  'New York · Commercial': 'Nueva York · Comercial',
+  'New York · Commercial & residential': 'Nueva York · Comercial y residencial',
   'Florida · Commercial & residential': 'Florida · Comercial y residencial',
   'New York · 276 Fifth Ave.': 'Nueva York · 276 Fifth Ave.',
   // property types

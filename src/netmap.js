@@ -12,7 +12,7 @@ const C = {
   bld: '#131926', bldLine: '#1a2231', minor: '#1a2131', major: '#262f45', motor: '#33405f', state: '#2a3550',
 };
 // Which side of the screen each chapter's text sits on (matches ui.js)
-const SIDES = ['left', 'left', 'left', 'right', 'left', 'center', 'right', 'left'];
+const SIDES = ['left', 'left', 'left', 'right', 'left', 'left', 'center', 'right', 'left'];
 
 // ---- Map style: our own, minimal and dark ----------------------------------------------
 function style() {
@@ -51,6 +51,7 @@ const VIEWS = [
   { c: [-74.000, 40.728], z: 11.7, b: 29 },        // 02 New York: the harbour and Manhattan
   { c: [-81.340, 28.590], z: 9.9, b: 0 },          // 03 Commercial: Central Florida
   { c: [-81.282, 28.670], z: 11.3, b: 0 },         // 04 Residential: Seminole County around the office
+  { c: [-73.950, 40.740], z: 10.6, b: 0 },         // 05 Residential: New York's neighbourhoods
   { c: [-81.2605, 28.6555], z: 11.0, b: 0 },       // 05 Advisory: the services around the office
   { c: [-77.7, 34.5], z: 4.75, b: 0 },             // 06 Track record: both cities
   { c: [-81.36, 28.58], z: 8.9, b: 0 },            // 07 Listings: Central Florida
@@ -71,6 +72,11 @@ const COMMERCIAL_FL = [
 const DISTRICTS = [
   ['Financial District', -74.0110, 40.7075], ['Midtown', -73.9840, 40.7549], ['Hudson Yards', -74.0010, 40.7536],
   ['Downtown Brooklyn', -73.9903, 40.6928], ['Long Island City', -73.9485, 40.7447], ['Jersey City', -74.0431, 40.7178],
+];
+const NY_HOODS = [
+  ['Upper West Side', -73.9754, 40.7870], ['Upper East Side', -73.9566, 40.7736], ['Harlem', -73.9465, 40.8116],
+  ['Astoria', -73.9230, 40.7644], ['Williamsburg', -73.9571, 40.7081], ['Park Slope', -73.9799, 40.6710],
+  ['Forest Hills', -73.8448, 40.7180], ['Riverdale', -73.9126, 40.8900],
 ];
 const HOODS = [
   ['Winter Springs', -81.3081, 28.6989], ['Oviedo', -81.2081, 28.6700], ['Casselberry', -81.3279, 28.6778], ['Longwood', -81.3384, 28.7031],
@@ -99,8 +105,8 @@ function buildNetwork(serviceNames) {
   const add = (id, coord, props) => nodes.push({ type: 'Feature', id: nodes.length + 1, properties: { key: id, ...props }, geometry: { type: 'Point', coordinates: coord } });
   const link = (key, a, b, chapters, bow, props = {}) => edges.push({ type: 'Feature', id: edges.length + 1, properties: { key, ch: chapters.join(','), ...props }, geometry: { type: 'LineString', coordinates: curve(a, b, bow) } });
 
-  add('hub-ny', NY, { kind: 'hub', label: 'New York · 276 Fifth Ave.', ch: '1,5,7', office: 'new-york' });
-  add('hub-fl', FL, { kind: 'hub', label: 'Winter Springs, FL', ch: '2,3,4,5,6,7', office: 'orlando' });
+  add('hub-ny', NY, { kind: 'hub', label: 'New York · 276 Fifth Ave.', ch: '1,4,6,8', office: 'new-york' });
+  add('hub-fl', FL, { kind: 'hub', label: 'Winter Springs, FL', ch: '2,3,5,6,7,8', office: 'orlando' });
   DISTRICTS.forEach(([name, lon, lat], i) => { add(`d${i}`, [lon, lat], { kind: 'node', label: name, ch: '1' }); link(`d${i}`, NY, [lon, lat], [1], i % 2 ? 0.2 : -0.2); });
   TYPES.forEach(([name, lon, lat], i) => {
     const p = [lon, lat];
@@ -116,12 +122,13 @@ function buildNetwork(serviceNames) {
   serviceNames.forEach((name, i) => {
     const ang = (i / serviceNames.length) * Math.PI * 2 - Math.PI / 2;
     const p = [FL[0] + Math.cos(ang) * 0.05 / Math.cos(FL[1] * Math.PI / 180), FL[1] + Math.sin(ang) * 0.05];
-    add(`s${i}`, p, { kind: 'node', label: `${String(i + 1).padStart(2, '0')} · ${name}`, short: String(i + 1).padStart(2, '0'), ch: '4', service: i, quiet: 1 });
-    link(`s${i}`, FL, p, [4], 0.08, { service: i });
+    add(`s${i}`, p, { kind: 'node', label: `${String(i + 1).padStart(2, '0')} · ${name}`, short: String(i + 1).padStart(2, '0'), ch: '5', service: i, quiet: 1 });
+    link(`s${i}`, FL, p, [5], 0.08, { service: i });
   });
-  MARKETS.forEach(([name, lon, lat], i) => { add(`m${i}`, [lon, lat], { kind: 'node', label: name, ch: '6' }); link(`m${i}`, FL, [lon, lat], [6], i % 2 ? 0.15 : -0.15); });
+  NY_HOODS.forEach(([name, lon, lat], i) => { add(`r${i}`, [lon, lat], { kind: 'node', label: name, ch: '4' }); link(`r${i}`, NY, [lon, lat], [4], i % 2 ? 0.18 : -0.18); });
+  MARKETS.forEach(([name, lon, lat], i) => { add(`m${i}`, [lon, lat], { kind: 'node', label: name, ch: '7' }); link(`m${i}`, FL, [lon, lat], [7], i % 2 ? 0.15 : -0.15); });
   // the line between the two offices
-  link('ny-fl', NY, FL, [1, 2, 5, 7], 0.12, { long: 1 });
+  link('ny-fl', NY, FL, [1, 2, 6, 8], 0.12, { long: 1 });
   return { nodes, edges };
 }
 
@@ -195,6 +202,7 @@ export function createNetMap({ container, services }) {
     { keys: ['hub-ny', 'd'], b: 29 },
     { keys: ['hub-fl', 'c', 't'], b: 0 },
     { keys: ['hub-fl', 'h'], b: 0 },
+    { keys: ['hub-ny', 'r'], b: 0 },
     { keys: ['hub-fl', 's'], b: 0 },
     { keys: ['hub-ny', 'hub-fl'], b: 0, behind: true },
     { keys: ['hub-fl', 'm'], b: 0 },

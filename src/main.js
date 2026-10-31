@@ -270,7 +270,7 @@ async function boot() {
   const frame = { pos: new Vector3(), look: new Vector3(), ox: 0, oy: 0, fov: 40, flight: 0 };
   // ?cam=lat,lon,altM,lookLat,lookLon,lookAltM places the camera anywhere (for tuning scenes).
   const debugCam = params.has('cam') ? (() => { const v = params.get('cam').split(',').map(Number); return [P(v[0], v[1], v[2]), P(v[3], v[4], v[5])]; })() : null;
-  if (params.has('p')) pinnedP = Math.min(CHAPTERS - 1, Math.max(0, parseFloat(params.get('p')) || 0));
+  if (params.has('p')) pinnedP = Math.min(chapters.length - 1, Math.max(0, parseFloat(params.get('p')) || 0));
   let p = progressFromScroll();
   let pSmooth = p;
   let introT = reducedMotion.matches || pinnedP !== null ? 1 : 0;
